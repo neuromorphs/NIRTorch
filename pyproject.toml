@@ -2,7 +2,7 @@
 requires = ["setuptools"]
 
 [project]
-name = "NIRTorch"
+name = "nirtorch"
 version = "0.0.1"
 description = "Neuromorphic Intermediate Representation"
 authors = [
@@ -28,4 +28,4 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = [ "torch" ]
+dependencies = [ "torch", "nir" ]
