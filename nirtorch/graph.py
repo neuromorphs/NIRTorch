@@ -62,7 +62,6 @@ class Node:
 class Graph:
     def __init__(self, module_names: Dict[nn.Module, str]) -> None:
         self.module_names = module_names
-        self.elem_list = []
         self.node_list: List[Node] = []
         self._last_used_tensor_id = None
         # Add modules to node_list
@@ -87,8 +86,8 @@ class Graph:
         return str(self._last_used_tensor_id)
 
     def __contains__(self, elem: Union[torch.Tensor, nn.Module]) -> bool:
-        for elem_in_list in self.elem_list:
-            if elem is elem_in_list:
+        for node in self.node_list:
+            if elem is node.elem:
                 return True
         return False
 
@@ -98,7 +97,6 @@ class Graph:
             return self.find_node(elem)
         else:
             node = Node(elem, name)
-            self.elem_list.append(elem)
             self.node_list.append(node)
             return node
 

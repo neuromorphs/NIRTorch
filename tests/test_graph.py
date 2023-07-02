@@ -26,7 +26,7 @@ def test_sequential_graph_extract():
     ).ignore_tensors()
     print(graph)
 
-    assert(len(graph.elem_list) == 11)
+    assert(len(graph.node_list) == 11)
 
 
 
@@ -196,7 +196,7 @@ def test_snn_branched():
     )
 
     print(graph)
-    assert len(graph.elem_list) == 27  # 2*13 + 1
+    assert len(graph.node_list) == 27  # 2*13 + 1
 
 
 def test_ignore_tensors():
