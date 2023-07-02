@@ -237,7 +237,6 @@ graph TD;
                     source_node_list.append(source_node)
         return source_node_list
 
-
     def ignore_tensors(self) -> "Graph":
         """Simplify the graph by ignoring all the tensors in it
 
@@ -246,10 +245,11 @@ graph TD;
         """
         return self.ignore_nodes(torch.Tensor)
 
-
-    def ignore_nodes(self, class_type: Type)->"Graph":
+    def ignore_nodes(self, class_type: Type) -> "Graph":
         # Filter module names to remove the given class type
-        new_module_names = {k: v for k, v in self.module_names.items() if not isinstance(k, class_type)}
+        new_module_names = {
+            k: v for k, v in self.module_names.items() if not isinstance(k, class_type)
+        }
 
         # Generate the new graph with the filtered module names
         graph = Graph(new_module_names)
@@ -276,11 +276,11 @@ graph TD;
                         graph.add_edge(node.elem, outnode.elem)
         return graph
 
-    def get_root(self)->List[Node]:
+    def get_root(self) -> List[Node]:
         """Returns the root node/s of the graph
 
         Returns:
-            List[Node]: A list of root nodes for the graph. 
+            List[Node]: A list of root nodes for the graph.
         """
         roots = []
         for node in self.node_list:
@@ -343,7 +343,7 @@ class GraphTracer:
         nn.Module.__call__ = self.original_torch_call
 
 
-def extract_graph(
+def extract_torch_graph(
     model: nn.Module, sample_data: Any, model_name: Optional[str] = "model"
 ) -> Graph:
     """Extract computational graph between various modules in the model
