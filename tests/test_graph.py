@@ -110,7 +110,7 @@ def test_module_forward_wrapper():
 
 
 def test_graph_tracer():
-    from sinabs.graph import GraphTracer, named_modules_map
+    from nirtorch.graph import GraphTracer, named_modules_map
 
     with GraphTracer(named_modules_map(mymodel)) as tracer, torch.no_grad():
         out = mymodel(data)
@@ -200,7 +200,14 @@ def test_snn_branched():
 
 
 def test_ignore_tensors():
-    from sinabs import extract_graph
+    from nirtorch.graph import extract_graph
     graph = extract_graph(mymodel, sample_data=data)
     mod_only_graph = graph.ignore_tensors()
     assert len(mod_only_graph.node_list) == 6
+
+
+def test_root_has_no_source():
+    from nirtorch.graph import extract_graph
+    graph = extract_graph(mymodel, sample_data=data)
+    graph = graph.ignore_tensors()
+    assert len(graph.find_source_nodes_of(graph.find_node(mymodel.relu1))) == 0
