@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 from sinabs.layers import Merge
+import pytest
 
 
 def test_sequential_graph_extract():
@@ -56,7 +57,7 @@ batch_size = 1
 
 data = torch.ones((batch_size, *input_shape))
 
-mymodel = MyBranchedModel()
+my_branched_model = MyBranchedModel()
 
 
 class DeepModel(nn.Module):
@@ -77,7 +78,7 @@ mydeepmodel = DeepModel()
 def test_named_modules_map():
     from nirtorch.graph import named_modules_map
 
-    mod_map = named_modules_map(mymodel)
+    mod_map = named_modules_map(my_branched_model)
     print(mod_map)
     for k, v in mod_map.items():
         assert isinstance(k, nn.Module)
@@ -112,8 +113,8 @@ def test_module_forward_wrapper():
 def test_graph_tracer():
     from nirtorch.graph import GraphTracer, named_modules_map
 
-    with GraphTracer(named_modules_map(mymodel)) as tracer, torch.no_grad():
-        out = mymodel(data)
+    with GraphTracer(named_modules_map(my_branched_model)) as tracer, torch.no_grad():
+        out = my_branched_model(data)
 
     print(tracer.graph)
     assert (
@@ -201,13 +202,32 @@ def test_snn_branched():
 
 def test_ignore_tensors():
     from nirtorch.graph import extract_graph
-    graph = extract_graph(mymodel, sample_data=data)
+    graph = extract_graph(my_branched_model, sample_data=data)
     mod_only_graph = graph.ignore_tensors()
     assert len(mod_only_graph.node_list) == 6
 
 
 def test_root_has_no_source():
     from nirtorch.graph import extract_graph
-    graph = extract_graph(mymodel, sample_data=data)
+    graph = extract_graph(my_branched_model, sample_data=data)
     graph = graph.ignore_tensors()
-    assert len(graph.find_source_nodes_of(graph.find_node(mymodel.relu1))) == 0
+    assert len(graph.find_source_nodes_of(graph.find_node(my_branched_model.relu1))) == 0
+
+def test_get_root():
+    from nirtorch.graph import extract_graph
+    graph = extract_graph(my_branched_model, sample_data=data, model_name=None)
+    graph = graph.ignore_tensors()
+    root_nodes = graph.get_root()
+    assert len(root_nodes) == 1
+    assert root_nodes[0].elem == my_branched_model.relu1
+
+
+def test_ignore_nodes_parent_model():
+    from nirtorch.graph import extract_graph
+    graph = extract_graph(my_branched_model, sample_data=data, model_name="ShouldDisappear")
+
+    new_graph = graph.ignore_nodes(MyBranchedModel)
+    print(new_graph)
+
+    with pytest.raises(ValueError):
+        new_graph.find_node(my_branched_model)

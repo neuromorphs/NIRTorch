@@ -248,18 +248,22 @@ graph TD;
 
 
     def ignore_nodes(self, class_type: Type)->"Graph":
-        graph = Graph(self.module_names)
+        # Filter module names to remove the given class type
+        new_module_names = {k: v for k, v in self.module_names.items() if not isinstance(k, class_type)}
+
+        # Generate the new graph with the filtered module names
+        graph = Graph(new_module_names)
         # Iterate over all the nodes
         for node in self.node_list:
             if isinstance(node.elem, class_type):
                 # Get its source
                 source_node_list = self.find_source_nodes_of(node)
-                # If no source, this is probably origin node, just drop it
                 if len(source_node_list) == 0:
+                    # If no source, this is probably origin node, just drop it
                     continue
                 # Get all of its destinations
-                # If no destinations, it is a leaf node, just drop it.
                 if node.outgoing_nodes:
+                    # If no destinations, it is a leaf node, just drop it.
                     for outgoing_node in node.outgoing_nodes:
                         # Directly add an edge from source to destination
                         for source_node in source_node_list:
@@ -271,6 +275,19 @@ graph TD;
                     if not isinstance(outnode.elem, class_type):
                         graph.add_edge(node.elem, outnode.elem)
         return graph
+
+    def get_root(self)->List[Node]:
+        """Returns the root node/s of the graph
+
+        Returns:
+            List[Node]: A list of root nodes for the graph. 
+        """
+        roots = []
+        for node in self.node_list:
+            sources = self.find_source_nodes_of(node)
+            if len(sources) == 0:
+                roots.append(node)
+        return roots
 
 
 _torch_module_call = torch.nn.Module.__call__
