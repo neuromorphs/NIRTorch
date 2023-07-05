@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 import torch
 import torch.nn as nn
@@ -12,7 +12,8 @@ def named_modules_map(
 
     Args:
         model (nn.Module): The module to be hashed
-        model_name (str | None): Name of the top level module. If this doesn't need to be include, this option can be set to None
+        model_name (str | None): Name of the top level module. If this doesn't need
+            to be include, this option can be set to None
 
     Returns:
         Dict[str, nn.Module]: A dictionary with modules as keys, and names as values
@@ -129,6 +130,9 @@ class Graph:
             return
         if self._is_mod_and_not_in_module_names(destination):
             return
+
+        if source is None or destination is None:
+            return  # Stateful models may have Nones
 
         source_node = self.add_or_get_node_for_elem(source)
         destination_node = self.add_or_get_node_for_elem(destination)
@@ -268,9 +272,11 @@ graph TD;
                         # Directly add an edge from source to destination
                         for source_node in source_node_list:
                             graph.add_edge(source_node.elem, outgoing_node.elem)
-                            # NOTE: Assuming that the destination is not of the same type here
+                            # NOTE: Assuming that the destination is not of the same 
+                            # type here
             else:
-                # This is to preserve the graph if executed on a graph that is already filtered
+                # This is to preserve the graph if executed on a graph that is
+                # already filtered
                 for outnode in node.outgoing_nodes:
                     if not isinstance(outnode.elem, class_type):
                         graph.add_edge(node.elem, outnode.elem)
@@ -301,7 +307,7 @@ def module_forward_wrapper(model_graph: Graph) -> Callable[..., Any]:
             model_graph.add_edge(input_data, mod)
         out = _torch_module_call(mod, *args, **kwargs)
         if isinstance(out, tuple):
-            out_tuple
+            out_tuple = (out[0],)
         elif isinstance(out, torch.Tensor):
             out_tuple = (out,)
         else:
@@ -347,7 +353,8 @@ def extract_torch_graph(
     model: nn.Module, sample_data: Any, model_name: Optional[str] = "model"
 ) -> Graph:
     """Extract computational graph between various modules in the model
-    NOTE: This method is not capable of any compute happening outside of module definitions.
+    NOTE: This method is not capable of any compute happening outside of module 
+    definitions.
 
     Args:
         model (nn.Module): The module to be analysed
@@ -363,6 +370,6 @@ def extract_torch_graph(
     with GraphTracer(
         named_modules_map(model, model_name=model_name)
     ) as tracer, torch.no_grad():
-        out = model(sample_data)
+        _ = model(sample_data)
 
     return tracer.graph
