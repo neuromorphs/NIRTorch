@@ -38,12 +38,12 @@ def _switch_models_with_map(
     return nir.NIR(nodes, nir_graph.edges)
 
 
-def load(nir_graph: nir.NIR, model_map: Callable[[nn.Module], nn.Module]) -> nn.Module:
+def load(nir_graph: nir.NIR, model_map: Callable[[nir.NIR], nn.Module]) -> nn.Module:
     """Load a NIR object and convert it to a torch module using the given model map
 
     Args:
         nir_graph (nir.NIR): NIR object
-        model_map (Callable[[nn.Module], nn.Module]): A method that returns the a torch 
+        model_map (Callable[[nn.NIR], nn.Module]): A method that returns the a torch 
             module that corresponds to each NIR node.
 
     Returns:
