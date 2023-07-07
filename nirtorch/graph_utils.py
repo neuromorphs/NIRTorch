@@ -47,8 +47,7 @@ def is_acyclic(edges):
             return False
     return True
 
-def execution_order_up_to_node(node, edges, execution_ord
-er=None):
+def execution_order_up_to_node(node, edges, execution_order=None):
     """
     Given a node and graph edges, determine the execution order such
     that any node is only executed after its parents.
