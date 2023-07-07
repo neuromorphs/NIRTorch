@@ -1,7 +1,13 @@
 import torch.nn as nn
 import torch
 from sinabs.layers import Merge
+from norse.torch import LIFCell, SequentialState
 import pytest
+
+
+class TupleModule(torch.nn.Module):
+    def forward(self, data):
+        return (data, data)
 
 
 def test_sequential_graph_extract():
@@ -47,6 +53,18 @@ class MyBranchedModel(nn.Module):
         out3 = self.add_mod(out2_1, out2_2)
         out4 = self.relu3(out3)
         return out4
+
+
+class MyStatefulModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.relu1 = nn.ReLU()
+        self.lif = SequentialState(LIFCell())
+
+    def forward(self, data):
+        out1 = self.relu1(data)
+        out2, _ = self.lif(out1)
+        return out2
 
 
 input_shape = (2, 28, 28)
@@ -96,7 +114,7 @@ def test_module_forward_wrapper():
     nn.Module.__call__ = new_call
 
     with torch.no_grad():
-        out = mymodel(data)
+        _ = mymodel(data)
 
     # Restore normal behavior
     nn.Module.__call__ = orig_call
@@ -111,7 +129,7 @@ def test_graph_tracer():
     from nirtorch.graph import GraphTracer, named_modules_map
 
     with GraphTracer(named_modules_map(my_branched_model)) as tracer, torch.no_grad():
-        out = my_branched_model(data)
+        _ = my_branched_model(data)
 
     print(tracer.graph)
     assert (
@@ -123,7 +141,7 @@ def test_leaf_only_graph():
     from nirtorch.graph import GraphTracer, named_modules_map
 
     with GraphTracer(named_modules_map(mydeepmodel)) as tracer, torch.no_grad():
-        out = mydeepmodel(data)
+        _ = mydeepmodel(data)
 
     print(tracer.graph)
 
@@ -139,7 +157,7 @@ def test_ignore_submodules_of():
     from nirtorch.graph import GraphTracer, named_modules_map
 
     with GraphTracer(named_modules_map(mydeepmodel)) as tracer, torch.no_grad():
-        out = mydeepmodel(data)
+        _ = mydeepmodel(data)
 
     top_overview_graph = tracer.graph.ignore_submodules_of(
         [MyBranchedModel]
@@ -195,6 +213,14 @@ def test_snn_branched():
 
     print(graph)
     assert len(graph.node_list) == 27  # 2*13 + 1
+
+
+def test_snn_stateful():
+    from nirtorch.graph import extract_torch_graph
+
+    model = MyStatefulModel()
+    graph = extract_torch_graph(model, sample_data=torch.rand((1, 2, 3, 4)))
+    assert len(graph.node_list) == 7  # 2 + 1 nested + 4 tensors
 
 
 def test_ignore_tensors():
