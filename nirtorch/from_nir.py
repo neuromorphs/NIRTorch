@@ -1,19 +1,69 @@
+import torch
 import torch.nn as nn
 import nir
-from typing import Callable
-from .graph import Graph
+from typing import Callable, List
+from .graph import Graph, Node
 
 
-class ExtractedModel(nn.Module):
+def execution_order_up_to_node(
+    node: Node, graph: Graph, execution_order: List[Node]
+) -> List[Node]:
+    """Recursive function to evaluate execution order until a given node
+
+    Args:
+        node (Node): Execution order for the node of interest
+        graph (Graph): Graph object describing the network
+        execution_order (List[Node]): The current known execution order.
+
+    Returns:
+        List[Node]: Execution order
+    """
+    if len(execution_order) == list(graph.node_list):
+        # All nodes are executed
+        return execution_order
+    for parent in graph.find_source_nodes_of(node):
+        if parent not in execution_order:
+            execution_order = execution_order_up_to_node(parent, graph, execution_order)
+    # Finally since all parents are known and executed
+    return execution_order + [node]
+
+
+class GraphExecutor(nn.Module):
     def __init__(self, graph: Graph) -> None:
         super().__init__()
         self.graph = graph
+        self.instantiate_modules()
+        self.execution_order = self.get_execution_order()
 
-    def instantiate_modules(self, graph: Graph):
-        raise NotImplementedError()
+    def instantiate_modules(self):
+        for mod, name in self.graph.module_names.items():
+            self.add_module(name, mod)
 
-    def forward(self, x):
-        raise NotImplementedError()
+    def get_execution_order(self) -> List[Node]:
+        """
+        Evaluate the execution order and instantiate that as a list
+        """
+        execution_order = []
+        # Then loop over all nodes and check that they are added to the execution order.
+        for node in self.graph.node_list:
+            if node not in execution_order:
+                execution_order = execution_order_up_to_node(
+                    node, self.graph, execution_order
+                )
+        return execution_order
+
+    def forward(self, data: torch.Tensor):
+        outs = {}
+        for node in self.execution_order:
+            input_nodes = self.graph.find_source_nodes_of(node)
+            if len(input_nodes) == 0:
+                # This is the root node
+                outs[node.name] = node.elem(data)
+            else:
+                # Intermediate nodes
+                input_data = (outs[node.name] for node in input_nodes)
+                outs[node.name] = node.elem(*input_data)
+        return outs[node.name]
 
 
 def _convert_number_to_legal_variable_name(num: int) -> str:
@@ -43,7 +93,7 @@ def load(nir_graph: nir.NIR, model_map: Callable[[nir.NIR], nn.Module]) -> nn.Mo
 
     Args:
         nir_graph (nir.NIR): NIR object
-        model_map (Callable[[nn.NIR], nn.Module]): A method that returns the a torch 
+        model_map (Callable[[nn.NIR], nn.Module]): A method that returns the a torch
             module that corresponds to each NIR node.
 
     Returns:
@@ -53,6 +103,5 @@ def load(nir_graph: nir.NIR, model_map: Callable[[nir.NIR], nn.Module]) -> nn.Mo
     nir_module_graph = _switch_models_with_map(nir_graph, model_map)
     # Build a nirtorch.Graph based on the nir_graph
     graph = _mod_nir_to_graph(nir_module_graph)
-    # Build and return ExtractedModule
-    model = ExtractedModel(graph)
-    return model
+    # Build and return a graph executor module
+    return GraphExecutor(graph)
