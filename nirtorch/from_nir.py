@@ -1,19 +1,34 @@
+from typing import Callable, Optional
+
 import torch.nn as nn
 import nir
-from typing import Callable
-from .graph import Graph
+from .graph import Graph, Node
 
 
 class ExtractedModel(nn.Module):
     def __init__(self, graph: Graph) -> None:
         super().__init__()
         self.graph = graph
+        root_nodes = graph.get_root()
+        print(root_nodes)
+        assert len(root_nodes) == 1, "Currently, we only support one input node"
+        self.root_node = root_nodes[0]
 
-    def instantiate_modules(self, graph: Graph):
-        raise NotImplementedError()
+    def apply_recursive(self, m: Node, *args):
+        y = m.elem(*args)
+        if len(m.outgoing_nodes) == 0:
+            return y
+        output = []
+        for child in m.outgoing_nodes():
+            if isinstance(y, tuple) or isinstance(y, list):
+                output.append(self.apply_recursive(child, *y))
+            else:
+                output.append(self.apply_recursive(child, y))
+        return output
+        
 
     def forward(self, x):
-        raise NotImplementedError()
+        return self.root_node(x)
 
 
 def _convert_number_to_legal_variable_name(num: int) -> str:
@@ -27,18 +42,19 @@ def _mod_nir_to_graph(nir_graph: nir.NIR) -> Graph:
     }
     graph = Graph(module_names=module_names)
     for src, dst in nir_graph.edges:
-        graph.add_edge(src, dst)
+        graph.add_edge(nir_graph.nodes[src], nir_graph.nodes[dst])
     return graph
 
 
 def _switch_models_with_map(
-    nir_graph: nir.NIR, model_map: Callable[[nn.Module], nn.Module]
+    nir_graph: nir.NIR, model_map: Callable[[nir.NIRNode], Optional[nn.Module]]
 ) -> nir.NIR:
     nodes = [model_map(node) for node in nir_graph.nodes]
+    nodes = [x for x in nodes if x is not None]
     return nir.NIR(nodes, nir_graph.edges)
 
 
-def load(nir_graph: nir.NIR, model_map: Callable[[nir.NIR], nn.Module]) -> nn.Module:
+def load(nir_graph: nir.NIR, model_map: Callable[[nir.NIRNode], Optional[nn.Module]]) -> nn.Module:
     """Load a NIR object and convert it to a torch module using the given model map
 
     Args:
