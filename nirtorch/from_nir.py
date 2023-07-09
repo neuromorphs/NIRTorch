@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import nir
-from typing import Callable, List
+from typing import Callable, List, Optional, Tuple
 from .graph import Graph, Node
 
 
@@ -34,6 +34,9 @@ class GraphExecutor(nn.Module):
         self.graph = graph
         self.instantiate_modules()
         self.execution_order = self.get_execution_order()
+        if len(self.execution_order) == 0:
+            raise ValueError("Graph is empty")
+        self.root_node = self.execution_order[0]
 
     def instantiate_modules(self):
         for mod, name in self.graph.module_names.items():
@@ -52,18 +55,21 @@ class GraphExecutor(nn.Module):
                 )
         return execution_order
 
-    def forward(self, data: torch.Tensor):
-        outs = {}
-        for node in self.execution_order:
-            input_nodes = self.graph.find_source_nodes_of(node)
-            if len(input_nodes) == 0:
-                # This is the root node
-                outs[node.name] = node.elem(data)
+    def forward_recursive(self, node: Node, *args):
+        y = node.elem(*args)
+        if len(node.outgoing_nodes) == 0:
+            return y
+        output = []
+        for child in node.outgoing_nodes:
+            if isinstance(y, tuple):
+                output.append(self.forward_recursive(child, *y))
             else:
-                # Intermediate nodes
-                input_data = (outs[node.name] for node in input_nodes)
-                outs[node.name] = node.elem(*input_data)
-        return outs[node.name]
+                output.append(self.forward_recursive(child, y))
+        return output
+
+    def forward(self, data: torch.Tensor):
+        # Note: We assume singular inputs/outputs for now
+        return self.forward_recursive(self.root_node, data, None)
 
 
 def _convert_number_to_legal_variable_name(num: int) -> str:
