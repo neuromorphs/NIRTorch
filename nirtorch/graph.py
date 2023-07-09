@@ -1,4 +1,5 @@
 import warnings
+from numbers import Number
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 import torch
@@ -109,6 +110,8 @@ class Graph:
             if elem in self.module_names:
                 name = self.module_names[elem]
             else:
+                if isinstance(elem, Number):
+                    elem = torch.as_tensor(elem)
                 assert isinstance(elem, torch.Tensor)
                 name = f"Tensor_{self.get_unique_tensor_id()}{tuple(elem.shape)}"
             # add and return the node
@@ -272,7 +275,7 @@ graph TD;
                         # Directly add an edge from source to destination
                         for source_node in source_node_list:
                             graph.add_edge(source_node.elem, outgoing_node.elem)
-                            # NOTE: Assuming that the destination is not of the same 
+                            # NOTE: Assuming that the destination is not of the same
                             # type here
             else:
                 # This is to preserve the graph if executed on a graph that is
@@ -353,7 +356,7 @@ def extract_torch_graph(
     model: nn.Module, sample_data: Any, model_name: Optional[str] = "model"
 ) -> Graph:
     """Extract computational graph between various modules in the model
-    NOTE: This method is not capable of any compute happening outside of module 
+    NOTE: This method is not capable of any compute happening outside of module
     definitions.
 
     Args:

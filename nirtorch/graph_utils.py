@@ -5,6 +5,7 @@ def find_children(node, edges):
     """
     return set(child for (parent, child) in edges if parent == node)
 
+
 def find_parents(node, edges):
     """
     Given a node and the edges of a graph, find all direct parents of
@@ -12,7 +13,10 @@ def find_parents(node, edges):
     """
     return set(parent for (parent, child) in edges if child == node)
 
-def find_all_ancestors(node, edges, roots=None, parents_found=None, nodes_inspected=None):
+
+def find_all_ancestors(
+    node, edges, roots=None, parents_found=None, nodes_inspected=None
+):
     """
     Given a node and the edges of a graph, find all ancesters of
     that node.
@@ -33,11 +37,10 @@ def find_all_ancestors(node, edges, roots=None, parents_found=None, nodes_inspec
         # Account for nodes that have been added after start of the loop
         if not parent in nodes_inspected:
             parents_found.update(
-                find_all_ancestors(
-                    parent, edges, roots, parents_found,nodes_inspected
-                )
+                find_all_ancestors(parent, edges, roots, parents_found, nodes_inspected)
             )
     return parents_found
+
 
 def is_acyclic(edges):
     for node in all_nodes(edges):
@@ -46,6 +49,7 @@ def is_acyclic(edges):
             print(f"Node {node} is part of a cycle")
             return False
     return True
+
 
 def execution_order_up_to_node(node, edges, execution_order=None):
     """
@@ -57,10 +61,9 @@ def execution_order_up_to_node(node, edges, execution_order=None):
     parents = find_all_ancestors(node, edges)
     still_missing = parents.difference(execution_order)
     for missing_node in still_missing:
-        execution_order = generate_model_order_up_to(missing_node, edges, execution_order)
+        execution_order = generate_model_order_up_to(
+            missing_node, edges, execution_order
+        )
     execution_order.append(node)
 
     return execution_order
-
-
-

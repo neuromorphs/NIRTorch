@@ -33,27 +33,14 @@ class GraphExecutor(nn.Module):
         super().__init__()
         self.graph = graph
         self.instantiate_modules()
-        self.execution_order = self.get_execution_order()
-        if len(self.execution_order) == 0:
-            raise ValueError("Graph is empty")
-        self.root_node = self.execution_order[0]
+        root_nodes = graph.get_root()
+        if len(root_nodes) == 0:
+            raise ValueError("No root node found in the graph")
+        self.root_node = root_nodes[0]
 
     def instantiate_modules(self):
         for mod, name in self.graph.module_names.items():
             self.add_module(name, mod)
-
-    def get_execution_order(self) -> List[Node]:
-        """
-        Evaluate the execution order and instantiate that as a list
-        """
-        execution_order = []
-        # Then loop over all nodes and check that they are added to the execution order.
-        for node in self.graph.node_list:
-            if node not in execution_order:
-                execution_order = execution_order_up_to_node(
-                    node, self.graph, execution_order
-                )
-        return execution_order
 
     def forward_recursive(self, node: Node, *args):
         y = node.elem(*args)
@@ -68,8 +55,8 @@ class GraphExecutor(nn.Module):
         return output
 
     def forward(self, data: torch.Tensor):
-        # Note: We assume singular inputs/outputs for now
-        return self.forward_recursive(self.root_node, data, None)
+        # Note: We assume single input/output for now
+        return self.forward_recursive(self.root_node, data)
 
 
 def _convert_number_to_legal_variable_name(num: int) -> str:
