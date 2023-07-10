@@ -3,7 +3,6 @@ import torch
 
 # from sinabs.layers import Merge
 from norse.torch import LIFCell, SequentialState
-import pytest
 
 
 class TupleModule(torch.nn.Module):
@@ -264,4 +263,3 @@ data = torch.ones((batch_size, *input_shape))
 
 #     with pytest.raises(ValueError):
 #         new_graph.find_node(my_branched_model)
-

@@ -3,8 +3,7 @@ from typing import Callable, List
 import nir
 import torch
 import torch.nn as nn
-import nir
-from typing import Callable, List, Optional, Tuple
+
 from .graph import Graph, Node
 
 
@@ -69,7 +68,7 @@ class GraphExecutor(nn.Module):
             else:
                 output.append(self.forward_recursive(child, y))
         if len(output) == 1:
-            return output [0]
+            return output[0]
         else:
             return output
 
@@ -100,7 +99,9 @@ def _switch_models_with_map(
     return nir.NIRGraph(nodes, nir_graph.edges)
 
 
-def load(nir_graph: nir.NIRNode, model_map: Callable[[nir.NIRNode], nn.Module]) -> nn.Module:
+def load(
+    nir_graph: nir.NIRNode, model_map: Callable[[nir.NIRNode], nn.Module]
+) -> nn.Module:
     """Load a NIR object and convert it to a torch module using the given model map
 
     Args:

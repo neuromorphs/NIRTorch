@@ -1,8 +1,11 @@
+from typing import Any, Optional, Callable
+
 import torch.nn as nn
-from typing import Any, Optional, Callable, List, Union
 import nir
 import numpy as np
+
 from .graph import extract_torch_graph
+
 
 def extract_nir_graph(
     model: nn.Module,
@@ -39,7 +42,6 @@ def extract_nir_graph(
         raise ValueError(
             f"Currently, only one input is supported, but {len(root_nodes)} was given"
         )
-    root_node = root_nodes[0]
 
     # Convert the nodes and get indices
     nir_edges = []

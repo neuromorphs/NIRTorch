@@ -21,7 +21,7 @@ def find_all_ancestors(
     Given a node and the edges of a graph, find all ancesters of
     that node.
     """
-    roots = roots or find_roots(edges)
+    roots = roots  # or find_roots(edges)
     if node in roots:
         return set()
 
@@ -35,35 +35,36 @@ def find_all_ancestors(
     # Find grandparents
     for parent in parents_found.difference(nodes_inspected):
         # Account for nodes that have been added after start of the loop
-        if not parent in nodes_inspected:
+        if parent not in nodes_inspected:
             parents_found.update(
                 find_all_ancestors(parent, edges, roots, parents_found, nodes_inspected)
             )
     return parents_found
 
 
-def is_acyclic(edges):
-    for node in all_nodes(edges):
-        all_parents = find_all_ancestors(node, edges)
-        if node in all_parents:
-            print(f"Node {node} is part of a cycle")
-            return False
-    return True
-
-
-def execution_order_up_to_node(node, edges, execution_order=None):
-    """
-    Given a node and graph edges, determine the execution order such
-    that any node is only executed after its parents.
-    """
-    execution_order = execution_order or []
-    # Make sure all parents are part of execution order
-    parents = find_all_ancestors(node, edges)
-    still_missing = parents.difference(execution_order)
-    for missing_node in still_missing:
-        execution_order = generate_model_order_up_to(
-            missing_node, edges, execution_order
-        )
-    execution_order.append(node)
-
-    return execution_order
+# def is_acyclic(edges):
+#     for node in all_nodes(edges):
+#         all_parents = find_all_ancestors(node, edges)
+#         if node in all_parents:
+#             print(f"Node {node} is part of a cycle")
+#             return False
+#     return True
+#
+#
+# def execution_order_up_to_node(node, edges, execution_order=None):
+#     """
+#     Given a node and graph edges, determine the execution order such
+#     that any node is only executed after its parents.
+#     """
+#     execution_order = execution_order or []
+#     # Make sure all parents are part of execution order
+#     parents = find_all_ancestors(node, edges)
+#     still_missing = parents.difference(execution_order)
+#     for missing_node in still_missing:
+#         execution_order = generate_model_order_up_to(
+#             missing_node, edges, execution_order
+#         )
+#     execution_order.append(node)
+#
+#     return execution_order
+#

@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-import norse.torch as norse
-
 import nir
 from nirtorch.to_nir import extract_nir_graph
 
@@ -56,7 +54,7 @@ class BranchedModel(nn.Module):
 
 # def test_extract_multiple_explicit():
 #     model = nn.Sequential(BranchedModel(1, 2, 3), nn.Linear(3, 4))
-# 
+#
 #     def extractor(module: nn.Module):
 #         if isinstance(module, BranchedModel):
 #             return nir.NIRGraph(
@@ -70,7 +68,7 @@ class BranchedModel(nn.Module):
 #             )
 #         else:
 #             return nir.Affine(module.weight, module.bias)
-# 
+#
 #     g = extract_nir_graph(model, extractor, torch.rand(1))
 #     print([type(n) for n in g.nodes])
 #     assert len(g.nodes) == 7
