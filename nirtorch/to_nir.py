@@ -46,8 +46,6 @@ def extract_nir_graph(
     nir_nodes = [nir.Input(np.array(sample_data.shape))]
     indices = {}
 
-
-
     # Get all the NIR nodes
     for indx, node in enumerate(torch_graph.node_list):
         # Convert the node type to NIR subgraph
@@ -55,7 +53,6 @@ def extract_nir_graph(
 
         if isinstance(mapped_node, nir.NIRGraph):
             current_node_index = len(nir_nodes)
-            # Add nodes from graph
             nir_nodes.extend(mapped_node.nodes)
             indices[node] = indx + len(mapped_node.nodes)
             # Add edges from graph

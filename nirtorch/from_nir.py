@@ -39,10 +39,6 @@ class GraphExecutor(nn.Module):
         self.execution_order = self.get_execution_order()
         if len(self.execution_order) == 0:
             raise ValueError("Graph is empty")
-        elif len(self.execution_order) > 1:
-            raise NotImplementedError(
-                "GraphExecutor only supports single output graphs for now"
-            )
         self.root_node = self.execution_order[0]
 
     def instantiate_modules(self):
@@ -72,11 +68,14 @@ class GraphExecutor(nn.Module):
                 output.append(self.forward_recursive(child, *y))
             else:
                 output.append(self.forward_recursive(child, y))
-        return output
+        if len(output) == 1:
+            return output [0]
+        else:
+            return output
 
     def forward(self, data: torch.Tensor):
         # Note: We assume singular inputs/outputs for now
-        return self.forward_recursive(self.root_node, data, None)
+        return self.forward_recursive(self.root_node, data)
 
 
 def _convert_number_to_legal_variable_name(num: int) -> str:
