@@ -70,7 +70,7 @@ def _mod_nir_to_graph(nir_graph: nir.NIR) -> Graph:
     }
     graph = Graph(module_names=module_names)
     for src, dst in nir_graph.edges:
-        graph.add_edge(src, dst)
+        graph.add_edge(nir_graph.nodes[src], nir_graph.nodes[dst])
     return graph
 
 
