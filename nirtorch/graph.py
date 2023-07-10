@@ -112,7 +112,8 @@ class Graph:
             else:
                 if isinstance(elem, Number):
                     elem = torch.as_tensor(elem)
-                assert isinstance(elem, torch.Tensor)
+                if not isinstance(elem, torch.Tensor):
+                    raise ValueError(f"Unknown element type {type(elem)}")
                 name = f"Tensor_{self.get_unique_tensor_id()}{tuple(elem.shape)}"
             # add and return the node
             new_node = self.add_elem(elem, name)
