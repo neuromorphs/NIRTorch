@@ -79,7 +79,7 @@ def _convert_number_to_legal_variable_name(num: int) -> str:
     return f"mod_{num}"
 
 
-def _mod_nir_to_graph(nir_graph: nir.NIR) -> Graph:
+def _mod_nir_to_graph(nir_graph: nir.NIRNode) -> Graph:
     module_names = {
         module: _convert_number_to_legal_variable_name(idx)
         for idx, module in enumerate(nir_graph.nodes)
@@ -91,18 +91,20 @@ def _mod_nir_to_graph(nir_graph: nir.NIR) -> Graph:
 
 
 def _switch_models_with_map(
-    nir_graph: nir.NIR, model_map: Callable[[nn.Module], nn.Module]
-) -> nir.NIR:
+    nir_graph: nir.NIRNode, model_map: Callable[[nn.Module], nn.Module]
+) -> nir.NIRNode:
     nodes = [model_map(node) for node in nir_graph.nodes]
-    return nir.NIR(nodes, nir_graph.edges)
+    return nir.NIRGraph(nodes, nir_graph.edges)
 
 
-def load(nir_graph: nir.NIR, model_map: Callable[[nir.NIR], nn.Module]) -> nn.Module:
+def load(
+    nir_graph: nir.NIRNode, model_map: Callable[[nir.NIRNode], nn.Module]
+) -> nn.Module:
     """Load a NIR object and convert it to a torch module using the given model map
 
     Args:
-        nir_graph (nir.NIR): NIR object
-        model_map (Callable[[nn.NIR], nn.Module]): A method that returns the a torch
+        nir_graph (nir.NIRNode): NIR object
+        model_map (Callable[[nn.NIRNode], nn.Module]): A method that returns the a torch
             module that corresponds to each NIR node.
 
     Returns:
@@ -112,5 +114,7 @@ def load(nir_graph: nir.NIR, model_map: Callable[[nir.NIR], nn.Module]) -> nn.Mo
     nir_module_graph = _switch_models_with_map(nir_graph, model_map)
     # Build a nirtorch.Graph based on the nir_graph
     graph = _mod_nir_to_graph(nir_module_graph)
+    # Build and return a graph executor module
+    return GraphExecutor(graph)
     # Build and return a graph executor module
     return GraphExecutor(graph)

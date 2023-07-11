@@ -264,4 +264,3 @@ def test_ignore_nodes_parent_model():
 
     with pytest.raises(ValueError):
         new_graph.find_node(my_branched_model)
-
