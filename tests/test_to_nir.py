@@ -42,14 +42,34 @@ def test_extract_nir_edges():
     assert nir_graph.edges == [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7)]
 
 
-class BranchedModel(nn.Module):
-    def __init__(self, a, b, c):
-        super().__init__()
-        self.a = torch.randn(a, b)
-        self.b = torch.randn(b, c)
+def test_nested_graph():
+    my_nested = nn.Sequential(
+        nn.Conv2d(1, 10, 3),
+        nn.ReLU(),
+        nn.Sequential(nn.Conv2d(10, 3, 3), nn.ReLU()),
+        nn.Conv2d(3, 2, 2),
+        nn.ReLU()
+    )
 
-    def forward(self, x):
-        return x @ self.a @ self.b
+    sample_data = torch.rand(1, 1, 60, 60)
+
+    def dummy_model_map(module: nn.Module) -> nir.NIRNode:
+        return nir.NIRNode()
+
+    nir_graph = extract_nir_graph(my_nested, dummy_model_map, sample_data)
+    assert isinstance(nir_graph, nir.NIRGraph)
+
+    assert len(nir_graph.nodes) == 5
+
+
+# class BranchedModel(nn.Module):
+#     def __init__(self, a, b, c):
+#         super().__init__()
+#         self.a = torch.randn(a, b)
+#         self.b = torch.randn(b, c)
+# 
+#     def forward(self, x):
+#         return x @ self.a @ self.b
 
 
 # def test_extract_multiple_explicit():
