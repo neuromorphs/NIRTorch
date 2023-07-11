@@ -33,7 +33,7 @@ def _extract_norse_module(module: torch.nn.Module) -> Optional[nir.NIRNode]:
 
 def to_nir(
     module: torch.nn.Module, sample_data: torch.Tensor, model_name: str = "norse"
-) -> nir.NIR:
+) -> nir.NIRNode:
     return extract_nir_graph(
         module, _extract_norse_module, sample_data, model_name=model_name
     )
