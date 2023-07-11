@@ -61,9 +61,18 @@ class Node:
         return hash(self.elem)
 
 
-class Graph:
-    def __init__(self, module_names: Dict[nn.Module, str]) -> None:
-        self.module_names = module_names
+class Graph(Node):
+    def __init__(
+        self,
+        elem: nn.Module,
+        name: str,
+        module_names: Optional[Dict[nn.Module, str]] = None,
+    ) -> None:
+        super().__init__(elem=elem, name=name)
+        if module_names is None:
+            self.module_names = named_modules_map(elem, name)
+        else:
+            self.module_names = module_names
         self.node_list: List[Node] = []
         self._last_used_tensor_id = None
         # Add modules to node_list
@@ -199,7 +208,7 @@ graph TD;
 
     def leaf_only(self) -> "Graph":
         leaf_modules = self.get_leaf_modules()
-        filtered_graph = Graph(leaf_modules)
+        filtered_graph = Graph(self.elem, self.name, module_names=leaf_modules)
         # Populate edges
         filtered_graph.populate_from(self)
         return filtered_graph
@@ -225,7 +234,7 @@ graph TD;
             if mod not in sub_modules_to_ignore:
                 new_named_modules[mod] = name
         # Create a new graph with the allowed modules
-        new_graph = Graph(new_named_modules)
+        new_graph = Graph(self.elem, name=self.name, module_names=new_named_modules)
         new_graph.populate_from(self)
         return new_graph
 
@@ -260,7 +269,7 @@ graph TD;
         }
 
         # Generate the new graph with the filtered module names
-        graph = Graph(new_module_names)
+        graph = Graph(self.elem, self.name, module_names=new_module_names)
         # Iterate over all the nodes
         for node in self.node_list:
             if isinstance(node.elem, class_type):
@@ -339,9 +348,9 @@ class GraphTracer:
     ```
     """
 
-    def __init__(self, mod: nn.Module) -> None:
+    def __init__(self, mod: nn.Module, name: str) -> None:
         self.original_torch_call = nn.Module.__call__
-        self.graph = Graph(mod)
+        self.graph = Graph(elem=mod, name=name)
 
     def __enter__(self) -> "GraphTracer":
         # Override the torch call method
@@ -371,9 +380,7 @@ def extract_torch_graph(
     Returns:
         Graph: A graph object representing the computational graph of the given model
     """
-    with GraphTracer(
-        named_modules_map(model, model_name=model_name)
-    ) as tracer, torch.no_grad():
+    with GraphTracer(model, model_name) as tracer, torch.no_grad():
         _ = model(sample_data)
 
     return tracer.graph

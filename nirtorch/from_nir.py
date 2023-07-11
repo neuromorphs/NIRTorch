@@ -84,7 +84,7 @@ def _mod_nir_to_graph(nir_graph: nir.NIRNode) -> Graph:
         module: _convert_number_to_legal_variable_name(idx)
         for idx, module in enumerate(nir_graph.nodes)
     }
-    graph = Graph(module_names=module_names)
+    graph = Graph(None, "GraphExecutor", module_names=module_names)
     for src, dst in nir_graph.edges:
         graph.add_edge(nir_graph.nodes[src], nir_graph.nodes[dst])
     return graph

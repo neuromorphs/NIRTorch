@@ -108,7 +108,7 @@ def test_module_forward_wrapper():
 
     from nirtorch.graph import Graph, module_forward_wrapper, named_modules_map
 
-    model_graph = Graph(named_modules_map(mymodel))
+    model_graph = Graph(elem=mymodel, name="MyBranchedModel", module_names=named_modules_map(mymodel))
     new_call = module_forward_wrapper(model_graph)
 
     # Override call to the new wrapped call
@@ -127,9 +127,9 @@ def test_module_forward_wrapper():
 
 
 def test_graph_tracer():
-    from nirtorch.graph import GraphTracer, named_modules_map
+    from nirtorch.graph import GraphTracer
 
-    with GraphTracer(named_modules_map(my_branched_model)) as tracer, torch.no_grad():
+    with GraphTracer(my_branched_model, "MyBranchedModel") as tracer, torch.no_grad():
         _ = my_branched_model(data)
 
     print(tracer.graph)
@@ -139,9 +139,9 @@ def test_graph_tracer():
 
 
 def test_leaf_only_graph():
-    from nirtorch.graph import GraphTracer, named_modules_map
+    from nirtorch.graph import GraphTracer
 
-    with GraphTracer(named_modules_map(mydeepmodel)) as tracer, torch.no_grad():
+    with GraphTracer(mydeepmodel, "MyDeepModel") as tracer, torch.no_grad():
         _ = mydeepmodel(data)
 
     print(tracer.graph)
@@ -157,7 +157,7 @@ def test_leaf_only_graph():
 def test_ignore_submodules_of():
     from nirtorch.graph import GraphTracer, named_modules_map
 
-    with GraphTracer(named_modules_map(mydeepmodel)) as tracer, torch.no_grad():
+    with GraphTracer(mydeepmodel, "MyDeepModel") as tracer, torch.no_grad():
         _ = mydeepmodel(data)
 
     top_overview_graph = tracer.graph.ignore_submodules_of(
@@ -264,3 +264,23 @@ def test_ignore_nodes_parent_model():
 
     with pytest.raises(ValueError):
         new_graph.find_node(my_branched_model)
+
+
+def test_nested_graph():
+    import nir
+    from nirtorch.graph import extract_torch_graph
+
+    my_nested = nn.Sequential(
+        nn.Conv2d(1, 10, 3),
+        nn.ReLU(),
+        nn.Sequential(nn.Conv2d(10, 3, 3), nn.ReLU()),
+        nn.Conv2d(3, 2, 2),
+        nn.ReLU()
+    )
+
+    sample_data = torch.rand(1, 1, 60, 60)
+
+    nir_graph = extract_torch_graph(my_nested, sample_data, "top_model")
+    assert isinstance(nir_graph, nir.NIRGraph)
+
+    assert len(nir_graph.nodes) == 5
