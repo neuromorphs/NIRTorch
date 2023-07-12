@@ -1,10 +1,9 @@
-import torch
-import norse
-
 import nir
-from nirtorch.from_nir import load
-
+import norse
 import pytest
+import torch
+
+from nirtorch.from_nir import load
 
 
 def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:

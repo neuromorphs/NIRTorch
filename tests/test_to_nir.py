@@ -1,8 +1,8 @@
+import nir
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 
-import nir
 from nirtorch.to_nir import extract_nir_graph
 
 

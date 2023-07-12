@@ -9,7 +9,7 @@ import torch.nn as nn
 def named_modules_map(
     model: nn.Module, model_name: Optional[str] = "model"
 ) -> Dict[str, nn.Module]:
-    """Inverse of named modules dictionary
+    """Inverse of named modules dictionary.
 
     Args:
         model (nn.Module): The module to be hashed
@@ -159,7 +159,8 @@ class Graph:
         return filtered_module_names
 
     def _is_mod_and_not_in_module_names(self, elem: Any) -> bool:
-        """Check if a node is a module and is included in the module_names of this graph
+        """Check if a node is a module and is included in the module_names of this
+        graph.
 
         Args:
             node (Node): Node to verify
@@ -230,7 +231,7 @@ graph TD;
         return new_graph
 
     def find_source_nodes_of(self, node: Node) -> List[Node]:
-        """Find all the sources of a node in the graph
+        """Find all the sources of a node in the graph.
 
         Args:
             node (Node): Node of interest
@@ -246,7 +247,7 @@ graph TD;
         return source_node_list
 
     def ignore_tensors(self) -> "Graph":
-        """Simplify the graph by ignoring all the tensors in it
+        """Simplify the graph by ignoring all the tensors in it.
 
         Returns:
             Graph: Returns a simplified graph with only modules in it
@@ -287,7 +288,7 @@ graph TD;
         return graph
 
     def get_root(self) -> List[Node]:
-        """Returns the root node/s of the graph
+        """Returns the root node/s of the graph.
 
         Returns:
             List[Node]: A list of root nodes for the graph.
@@ -326,8 +327,7 @@ def module_forward_wrapper(model_graph: Graph) -> Callable[..., Any]:
 
 
 class GraphTracer:
-    """
-    Context manager to trace a model's execution graph
+    """Context manager to trace a model's execution graph.
 
     Example:
 

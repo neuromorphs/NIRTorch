@@ -1,26 +1,17 @@
 def find_children(node, edges):
-    """
-    Given a node and the edges of a graph, find all direct children of
-    that node.
-    """
+    """Given a node and the edges of a graph, find all direct children of that node."""
     return set(child for (parent, child) in edges if parent == node)
 
 
 def find_parents(node, edges):
-    """
-    Given a node and the edges of a graph, find all direct parents of
-    that node.
-    """
+    """Given a node and the edges of a graph, find all direct parents of that node."""
     return set(parent for (parent, child) in edges if child == node)
 
 
 def find_all_ancestors(
     node, edges, roots=None, parents_found=None, nodes_inspected=None
 ):
-    """
-    Given a node and the edges of a graph, find all ancesters of
-    that node.
-    """
+    """Given a node and the edges of a graph, find all ancesters of that node."""
     roots = roots  # or find_roots(edges)
     if node in roots:
         return set()

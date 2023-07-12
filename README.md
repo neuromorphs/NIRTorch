@@ -60,3 +60,13 @@ If you use NIR torch in your work, please cite the [following Zenodo reference](
   url          = {https://doi.org/10.5281/zenodo.8105042}
 }
 ```
+
+## For developers
+If you want to make sure locally that your code is linted correctly, use [pre-commit](https://pre-commit.com/) to automatically check at every git commit. To use it, first install it
+```
+pip install pre-commit
+```
+and then install the pre-commit hooks
+```
+pre-commit install
+```

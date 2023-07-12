@@ -1,9 +1,8 @@
-import torch.nn as nn
-import torch
-
-from sinabs.layers import Merge
-from norse.torch import LIFCell, SequentialState
 import pytest
+import torch
+import torch.nn as nn
+from norse.torch import LIFCell, SequentialState
+from sinabs.layers import Merge
 
 
 class TupleModule(torch.nn.Module):
@@ -168,8 +167,9 @@ def test_ignore_submodules_of():
 
 
 def test_snn_branched():
-    from sinabs.layers import IAFSqueeze, ChannelShift, SumPool2d
+    from sinabs.layers import ChannelShift, IAFSqueeze, SumPool2d
     from torch.nn import Conv2d
+
     from nirtorch.graph import extract_torch_graph
 
     class MySNN(nn.Module):
