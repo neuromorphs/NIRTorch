@@ -1,4 +1,4 @@
 pytest
 sinabs >= 1.2.8
 nir
-norse
+norse @ git+https://github.com/norse/norse@feature-nir
