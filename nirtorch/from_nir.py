@@ -10,7 +10,7 @@ from .graph import Graph, Node
 def execution_order_up_to_node(
     node: Node, graph: Graph, execution_order: List[Node]
 ) -> List[Node]:
-    """Recursive function to evaluate execution order until a given node
+    """Recursive function to evaluate execution order until a given node.
 
     Args:
         node (Node): Execution order for the node of interest
@@ -40,9 +40,7 @@ class GraphExecutor(nn.Module):
             raise ValueError("Graph is empty")
 
     def get_execution_order(self) -> List[Node]:
-        """
-        Evaluate the execution order and instantiate that as a list
-        """
+        """Evaluate the execution order and instantiate that as a list."""
         execution_order = []
         # Then loop over all nodes and check that they are added to the execution order.
         for node in self.graph.node_list:
@@ -100,7 +98,7 @@ def _switch_models_with_map(
 def load(
     nir_graph: nir.NIRNode, model_map: Callable[[nir.NIRNode], nn.Module]
 ) -> nn.Module:
-    """Load a NIR object and convert it to a torch module using the given model map
+    """Load a NIR object and convert it to a torch module using the given model map.
 
     Args:
         nir_graph (nir.NIRNode): NIR object

@@ -1,8 +1,8 @@
-from typing import Any, Optional, Callable
+from typing import Any, Callable, Optional
 
-import torch.nn as nn
 import nir
 import numpy as np
+import torch.nn as nn
 
 from .graph import extract_torch_graph
 
