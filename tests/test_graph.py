@@ -38,7 +38,7 @@ def test_sequential_graph_extract():
 
 
 # Branched model
-class MyBranchedModel(nn.Module):
+class SinabsBranchedModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.relu1 = nn.ReLU()
@@ -56,7 +56,7 @@ class MyBranchedModel(nn.Module):
         return out4
 
 
-class MyStatefulModel(nn.Module):
+class NorseStatefulModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.relu1 = nn.ReLU()
@@ -73,14 +73,14 @@ batch_size = 1
 
 data = torch.ones((batch_size, *input_shape))
 
-my_branched_model = MyBranchedModel()
+my_branched_model = SinabsBranchedModel()
 
 
 class DeepModel(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.block1 = MyBranchedModel()
-        self.block2 = MyBranchedModel()
+        self.block1 = SinabsBranchedModel()
+        self.block2 = SinabsBranchedModel()
 
     def forward(self, data):
         out = self.block1(data)
@@ -102,7 +102,7 @@ def test_named_modules_map():
 
 
 def test_module_forward_wrapper():
-    mymodel = MyBranchedModel()
+    mymodel = SinabsBranchedModel()
 
     orig_call = nn.Module.__call__
 
@@ -161,7 +161,7 @@ def test_ignore_submodules_of():
         _ = mydeepmodel(data)
 
     top_overview_graph = tracer.graph.ignore_submodules_of(
-        [MyBranchedModel]
+        [SinabsBranchedModel]
     ).leaf_only()
     print(top_overview_graph)
     assert len(top_overview_graph.node_list) == 2 + 2 + 1
@@ -219,7 +219,7 @@ def test_snn_branched():
 def test_snn_stateful():
     from nirtorch.graph import extract_torch_graph
 
-    model = MyStatefulModel()
+    model = NorseStatefulModel()
     graph = extract_torch_graph(model, sample_data=torch.rand((1, 2, 3, 4)))
     assert len(graph.node_list) == 7  # 2 + 1 nested + 4 tensors
 
@@ -259,7 +259,7 @@ def test_ignore_nodes_parent_model():
         my_branched_model, sample_data=data, model_name="ShouldDisappear"
     )
 
-    new_graph = graph.ignore_nodes(MyBranchedModel)
+    new_graph = graph.ignore_nodes(SinabsBranchedModel)
     print(new_graph)
 
     with pytest.raises(ValueError):
