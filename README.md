@@ -62,11 +62,12 @@ If you use NIR torch in your work, please cite the [following Zenodo reference](
 ```
 
 ## For developers
-If you want to make sure locally that your code is linted correctly, use [pre-commit](https://pre-commit.com/) to automatically check at every git commit. To use it, first install it
+If you want to make sure that your code is linted correctly on your local machine, use [pre-commit](https://pre-commit.com/) to automatically perform checks before every git commit. To use it, first install the package in your environment
 ```
 pip install pre-commit
 ```
-and then install the pre-commit hooks
+and then install the pre-commit hooks that are listed in the root of this repository
 ```
 pre-commit install
 ```
+Next time you commit some changes, all the checks will be run!
