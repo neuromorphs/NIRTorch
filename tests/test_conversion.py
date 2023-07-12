@@ -1,9 +1,9 @@
 import norse
-from norse.torch import SequentialState, LIFCell, LIF, IAF, IAFCell
-import torch
-import torch.nn as nn
 import sinabs
 import sinabs.layers as sl
+import torch
+import torch.nn as nn
+from norse.torch import IAFCell, SequentialState
 
 
 def test_norse_to_sinabs():
@@ -14,7 +14,9 @@ def test_norse_to_sinabs():
         torch.nn.Linear(2, 1),
     )
     batch_size = 2
-    nir_graph = norse.torch.utils.export.to_nir(norse_model, torch.randn(batch_size, 10))
+    nir_graph = norse.torch.utils.export.to_nir(
+        norse_model, torch.randn(batch_size, 10)
+    )
 
     sinabs_model = sinabs.from_nir(nir_graph, batch_size=batch_size)
     assert type(sinabs_model[0]) == sl.IAFSqueeze
@@ -27,4 +29,3 @@ def test_norse_to_sinabs():
     torch.testing.assert_close(norse_model[3].weight, sinabs_model[3].weight)
     torch.testing.assert_close(norse_model[1].bias, sinabs_model[1].bias)
     torch.testing.assert_close(norse_model[3].bias, sinabs_model[3].bias)
-    
