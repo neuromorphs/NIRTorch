@@ -1,9 +1,11 @@
 import warnings
 from numbers import Number
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union, Tuple
 
 import torch
 import torch.nn as nn
+
+__original_torch_call__ = nn.Module.__call__
 
 
 def named_modules_map(
@@ -75,9 +77,6 @@ class Graph(Node):
             self.module_names = module_names
         self.node_list: List[Node] = []
         self._last_used_tensor_id = None
-        # Add modules to node_list
-        for mod, name in self.module_names.items():
-            self.add_elem(mod, name)
 
     @property
     def node_map_by_id(self):
@@ -103,30 +102,41 @@ class Graph(Node):
         return False
 
     def add_elem(self, elem, name: str) -> Node:
+        print(len(self.node_list))
         if elem in self:
             warnings.warn(f"{name}: Node already exists for this element ")
             return self.find_node(elem)
+        elif isinstance(elem, Node):
+            self.node_list.append(elem)
         else:
+            # Create a new node
             node = Node(elem, name)
             self.node_list.append(node)
             return node
 
-    def add_or_get_node_for_elem(self, elem: Union[torch.Tensor, nn.Module]):
+    def add_or_get_node_for_elem(self, elem: Union[torch.Tensor, nn.Module, "Graph"]):
+        if isinstance(elem, Graph):
+            graph_node = elem
+            if graph_node.elem not in self:
+                self.add_elem(graph_node, graph_node.name)
+            return graph_node
+
         if elem in self:
             return self.find_node(elem)
+
+        # Generate a name
+        if elem in self.module_names:
+            name = self.module_names[elem]
         else:
-            # Generate a name
-            if elem in self.module_names:
-                name = self.module_names[elem]
-            else:
-                if isinstance(elem, Number):
-                    elem = torch.as_tensor(elem)
-                if not isinstance(elem, torch.Tensor):
-                    raise ValueError(f"Unknown element type {type(elem)}")
-                name = f"Tensor_{self.get_unique_tensor_id()}{tuple(elem.shape)}"
-            # add and return the node
-            new_node = self.add_elem(elem, name)
-            return new_node
+            if isinstance(elem, Number):
+                elem = torch.as_tensor(elem)
+            if not isinstance(elem, torch.Tensor):
+                raise ValueError(f"Unknown element type {type(elem)}")
+            name = f"Tensor_{self.get_unique_tensor_id()}{tuple(elem.shape)}"
+        # add and return the node
+        print(f"Creating node for {elem}")
+        new_node = self.add_elem(elem, name)
+        return new_node
 
     def find_node(self, elem: Union[torch.Tensor, nn.Module]):
         for node in self.node_list:
@@ -136,8 +146,8 @@ class Graph(Node):
 
     def add_edge(
         self,
-        source: Union[torch.Tensor, nn.Module],
-        destination: Union[torch.Tensor, nn.Module],
+        source: Union[torch.Tensor, nn.Module, "Graph"],
+        destination: Union[torch.Tensor, nn.Module, "Graph"],
     ):
         if self._is_mod_and_not_in_module_names(source):
             return
@@ -146,9 +156,9 @@ class Graph(Node):
 
         if source is None or destination is None:
             return  # Stateful models may have Nones
-
         source_node = self.add_or_get_node_for_elem(source)
         destination_node = self.add_or_get_node_for_elem(destination)
+        print(f"Adding edge from {source_node} to node {destination_node}")
         source_node.add_outgoing(destination_node)
         return source_node, destination_node
 
@@ -262,38 +272,37 @@ graph TD;
         """
         return self.ignore_nodes(torch.Tensor)
 
-    def ignore_nodes(self, class_type: Type) -> "Graph":
-        # Filter module names to remove the given class type
-        new_module_names = {
-            k: v for k, v in self.module_names.items() if not isinstance(k, class_type)
-        }
+    def has_elem_of_type(self, class_type: Type) -> bool:
+        """Check if elements of a certain class exist in the graph
 
-        # Generate the new graph with the filtered module names
-        graph = Graph(self.elem, self.name, module_names=new_module_names)
-        # Iterate over all the nodes
+        Args:
+            class_type (Type): Class name
+
+        Returns:
+            bool: Returns true if elements of the given type exist in the graph
+        """
         for node in self.node_list:
             if isinstance(node.elem, class_type):
-                # Get its source
-                source_node_list = self.find_source_nodes_of(node)
-                if len(source_node_list) == 0:
-                    # If no source, this is probably origin node, just drop it
-                    continue
-                # Get all of its destinations
-                if node.outgoing_nodes:
-                    # If no destinations, it is a leaf node, just drop it.
-                    for outgoing_node in node.outgoing_nodes:
-                        # Directly add an edge from source to destination
-                        for source_node in source_node_list:
-                            graph.add_edge(source_node.elem, outgoing_node.elem)
-                            # NOTE: Assuming that the destination is not of the same
-                            # type here
+                return True
+        return False
+
+    def ignore_nodes(self, class_type: Type) -> "Graph":
+        if not self.has_elem_of_type(class_type=class_type):
+            return self
+        # Otherwise create a new graph and iterate over its elements
+        new_graph = Graph(self.elem, self.name, module_names=self.module_names)
+        for node in self.node_list:
+            if isinstance(node.elem, class_type):
+                for destination_node in node.outgoing_nodes:
+                    for source_node in self.find_source_nodes_of(node):
+                        new_graph.add_edge(source_node.elem, destination_node.elem)
             else:
-                # This is to preserve the graph if executed on a graph that is
-                # already filtered
                 for outnode in node.outgoing_nodes:
+                    new_graph.add_elem(node.elem, node.name)
                     if not isinstance(outnode.elem, class_type):
-                        graph.add_edge(node.elem, outnode.elem)
-        return graph
+                        new_graph.add_edge(node.elem, outnode.elem)
+        # Ensure there are no nodes left in the grpah while adding edges
+        return new_graph.ignore_nodes(class_type=class_type)
 
     def get_root(self) -> List[Node]:
         """Returns the root node/s of the graph
@@ -309,26 +318,61 @@ graph TD;
         return roots
 
 
-_torch_module_call = torch.nn.Module.__call__
+def _convert_to_tuple(data) -> Tuple[torch.Tensor]:
+    # Sanitize the output
+    if isinstance(data, tuple):
+        return data
+    elif isinstance(data, torch.Tensor):
+        return (data,)
+    else:
+        raise Exception("Unknown output format")
+
+
+class OriginalTorchForward:
+    def __enter__(self):
+        self.current_call = nn.Module.__call__
+        print("Loading original call")
+        # Override the torch call method
+        nn.Module.__call__ = __original_torch_call__
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        # Restore normal behavior
+        nn.Module.__call__ = self.current_call
+        print("Restoring old call")
 
 
 def module_forward_wrapper(model_graph: Graph) -> Callable[..., Any]:
     def my_forward(mod: nn.Module, *args, **kwargs) -> Any:
-        # Iterate over all inputs
-        for i, input_data in enumerate(args):
-            # Create nodes and edges
-            model_graph.add_edge(input_data, mod)
-        out = _torch_module_call(mod, *args, **kwargs)
-        if isinstance(out, tuple):
-            out_tuple = (out[0],)
-        elif isinstance(out, torch.Tensor):
-            out_tuple = (out,)
+        print(f"Wrapper called on {mod}")
+        # Forward pass on the module
+        if list(mod.children()):
+            ## If the module is nested, generate another graph object
+            with OriginalTorchForward():
+                # inner_graph, out = extract_torch_graph(
+                # model=mod, sample_data=args, model_name=model_graph.module_names[mod]
+                # )
+                out = mod(*args, **kwargs)
+
+            out_tuple = _convert_to_tuple(out)
+            mod_node = mod
+            # I am ignoring a module with children
         else:
-            raise Exception("Unknown output format")
-        # Iterate over all outputs and create nodes and edges
-        for output_data in out_tuple:
+            out = __original_torch_call__(mod, *args, **kwargs)
+            out_tuple = _convert_to_tuple(out)
+            mod_node = mod
+
+        # Iterate over all inputs
+        for input_data in args:
             # Create nodes and edges
-            model_graph.add_edge(mod, output_data)
+            print(f"Adding input edge {mod_node}")
+            model_graph.add_edge(input_data, mod_node)
+        # Iterate over all outputs
+        for output_data in out_tuple:
+            print(f"Adding output edge {mod_node}")
+            # Create nodes and edges
+            model_graph.add_edge(mod_node, output_data)
+
         return out
 
     return my_forward
@@ -349,7 +393,6 @@ class GraphTracer:
     """
 
     def __init__(self, mod: nn.Module, name: str) -> None:
-        self.original_torch_call = nn.Module.__call__
         self.graph = Graph(elem=mod, name=name)
 
     def __enter__(self) -> "GraphTracer":
@@ -359,12 +402,12 @@ class GraphTracer:
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         # Restore normal behavior
-        nn.Module.__call__ = self.original_torch_call
+        nn.Module.__call__ = __original_torch_call__
 
 
 def extract_torch_graph(
     model: nn.Module, sample_data: Any, model_name: Optional[str] = "model"
-) -> Graph:
+) -> Tuple[Graph, torch.Tensor]:
     """Extract computational graph between various modules in the model
     NOTE: This method is not capable of any compute happening outside of module
     definitions.
@@ -381,6 +424,9 @@ def extract_torch_graph(
         Graph: A graph object representing the computational graph of the given model
     """
     with GraphTracer(model, model_name) as tracer, torch.no_grad():
-        _ = model(sample_data)
+        if isinstance(sample_data, tuple):
+            out = model(*sample_data)
+        else:
+            out = model(sample_data)
 
-    return tracer.graph
+    return tracer.graph, out

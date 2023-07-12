@@ -29,9 +29,9 @@ def test_sequential_graph_extract():
     )
 
     sample_data = torch.rand(1, 2, 32, 32)
-    graph = extract_torch_graph(
-        model=model, sample_data=sample_data, model_name=None
-    ).ignore_tensors()
+    graph = extract_torch_graph(model=model, sample_data=sample_data, model_name=None)[
+        0
+    ].ignore_tensors()
     print(graph)
 
     assert len(graph.node_list) == 11
@@ -108,7 +108,9 @@ def test_module_forward_wrapper():
 
     from nirtorch.graph import Graph, module_forward_wrapper, named_modules_map
 
-    model_graph = Graph(elem=mymodel, name="MyBranchedModel", module_names=named_modules_map(mymodel))
+    model_graph = Graph(
+        elem=mymodel, name="MyBranchedModel", module_names=named_modules_map(mymodel)
+    )
     new_call = module_forward_wrapper(model_graph)
 
     # Override call to the new wrapped call
@@ -155,7 +157,7 @@ def test_leaf_only_graph():
 
 
 def test_ignore_submodules_of():
-    from nirtorch.graph import GraphTracer, named_modules_map
+    from nirtorch.graph import GraphTracer
 
     with GraphTracer(mydeepmodel, "MyDeepModel") as tracer, torch.no_grad():
         _ = mydeepmodel(data)
@@ -210,7 +212,7 @@ def test_snn_branched():
     my_snn = MySNN()
     graph = extract_torch_graph(
         my_snn, sample_data=torch.rand((100, 2, 14, 14)), model_name=None
-    )
+    )[0]
 
     print(graph)
     assert len(graph.node_list) == 27  # 2*13 + 1
@@ -220,14 +222,14 @@ def test_snn_stateful():
     from nirtorch.graph import extract_torch_graph
 
     model = MyStatefulModel()
-    graph = extract_torch_graph(model, sample_data=torch.rand((1, 2, 3, 4)))
+    graph = extract_torch_graph(model, sample_data=torch.rand((1, 2, 3, 4)))[0]
     assert len(graph.node_list) == 7  # 2 + 1 nested + 4 tensors
 
 
 def test_ignore_tensors():
     from nirtorch.graph import extract_torch_graph
 
-    graph = extract_torch_graph(my_branched_model, sample_data=data)
+    graph = extract_torch_graph(my_branched_model, sample_data=data)[0]
     mod_only_graph = graph.ignore_tensors()
     assert len(mod_only_graph.node_list) == 6
 
@@ -235,7 +237,7 @@ def test_ignore_tensors():
 def test_root_has_no_source():
     from nirtorch.graph import extract_torch_graph
 
-    graph = extract_torch_graph(my_branched_model, sample_data=data)
+    graph = extract_torch_graph(my_branched_model, sample_data=data)[0]
     graph = graph.ignore_tensors()
     assert (
         len(graph.find_source_nodes_of(graph.find_node(my_branched_model.relu1))) == 0
@@ -245,7 +247,7 @@ def test_root_has_no_source():
 def test_get_root():
     from nirtorch.graph import extract_torch_graph
 
-    graph = extract_torch_graph(my_branched_model, sample_data=data, model_name=None)
+    graph = extract_torch_graph(my_branched_model, sample_data=data, model_name=None)[0]
     graph = graph.ignore_tensors()
     root_nodes = graph.get_root()
     assert len(root_nodes) == 1
@@ -257,7 +259,7 @@ def test_ignore_nodes_parent_model():
 
     graph = extract_torch_graph(
         my_branched_model, sample_data=data, model_name="ShouldDisappear"
-    )
+    )[0]
 
     new_graph = graph.ignore_nodes(MyBranchedModel)
     print(new_graph)
@@ -275,12 +277,19 @@ def test_nested_graph():
         nn.ReLU(),
         nn.Sequential(nn.Conv2d(10, 3, 3), nn.ReLU()),
         nn.Conv2d(3, 2, 2),
-        nn.ReLU()
+        nn.ReLU(),
     )
+
+    def dummy_model_map(_):
+        return nir.NIRNode()
 
     sample_data = torch.rand(1, 1, 60, 60)
 
-    nir_graph = extract_torch_graph(my_nested, sample_data, "top_model")
-    assert isinstance(nir_graph, nir.NIRGraph)
+    graph, _ = extract_torch_graph(my_nested, sample_data, "top_model")
+    print(graph)
 
-    assert len(nir_graph.nodes) == 5
+    graph = graph.ignore_tensors()
+    print(graph)
+    print([node for node in graph.node_list])
+
+    assert len(graph.node_list) == 5

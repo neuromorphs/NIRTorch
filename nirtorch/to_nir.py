@@ -34,7 +34,7 @@ def extract_nir_graph(
     # Extract a torch graph given the model
     torch_graph = extract_torch_graph(
         model, sample_data=sample_data, model_name=model_name
-    ).ignore_tensors()
+    )[0].ignore_tensors()
 
     # Get the root node
     root_nodes = torch_graph.get_root()
