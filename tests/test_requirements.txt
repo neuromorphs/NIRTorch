@@ -2,3 +2,4 @@ pytest
 sinabs >= 1.2.8
 nir
 norse @ git+https://github.com/norse/norse@feature-nir
+ruff
