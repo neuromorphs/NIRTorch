@@ -1,4 +1,9 @@
 pytest
-sinabs >= 1.2.8
+# Norse needs that
+torch >= 2.0.0
+# sinabs feature branch, can replace with just 'sinabs' once released
+sinabs @ git+https://github.com/synsense/sinabs@dev/nir
 nir
-norse
+# norse feature branch, can replace with just 'norse' once released
+norse @ git+https://github.com/norse/norse@feature-nir
+ruff
