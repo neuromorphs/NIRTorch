@@ -77,7 +77,7 @@ def extract_nir_graph(
         for destination in node.outgoing_nodes:
             nir_edges.append((indices[node], indices[destination]))
         if len(node.outgoing_nodes) == 0:
-            output_node = nir.Output()
+            output_node = nir.Output(None)
             outputs.append(output_node)
             nir_nodes.append(output_node)
             nir_edges.append((indices[node], len(nir_nodes) - 1))
