@@ -73,15 +73,8 @@ class GraphExecutor(nn.Module):
         return outs[node.name]
 
 
-def _convert_number_to_legal_variable_name(num: int) -> str:
-    return f"mod_{num}"
-
-
 def _mod_nir_to_graph(nir_graph: nir.NIRNode) -> Graph:
-    module_names = {
-        module: _convert_number_to_legal_variable_name(idx)
-        for idx, module in enumerate(nir_graph.nodes)
-    }
+    module_names = {module: name for name, module in nir_graph.nodes.items()}
     graph = Graph(module_names=module_names)
     for src, dst in nir_graph.edges:
         graph.add_edge(nir_graph.nodes[src], nir_graph.nodes[dst])
@@ -91,7 +84,7 @@ def _mod_nir_to_graph(nir_graph: nir.NIRNode) -> Graph:
 def _switch_models_with_map(
     nir_graph: nir.NIRNode, model_map: Callable[[nn.Module], nn.Module]
 ) -> nir.NIRNode:
-    nodes = [model_map(node) for node in nir_graph.nodes]
+    nodes = {name: model_map(node) for name, node in nir_graph.nodes.items()}
     return nir.NIRGraph(nodes, nir_graph.edges)
 
 
@@ -112,7 +105,5 @@ def load(
     nir_module_graph = _switch_models_with_map(nir_graph, model_map)
     # Build a nirtorch.Graph based on the nir_graph
     graph = _mod_nir_to_graph(nir_module_graph)
-    # Build and return a graph executor module
-    return GraphExecutor(graph)
     # Build and return a graph executor module
     return GraphExecutor(graph)

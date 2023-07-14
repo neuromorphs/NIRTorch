@@ -45,41 +45,39 @@ def extract_nir_graph(
 
     # Convert the nodes and get indices
     nir_edges = []
-    nir_nodes = [nir.Input(np.array(sample_data.shape))]
-    indices = {}
+    nir_nodes = {"input": nir.Input(np.array(sample_data.shape))}
 
     # Get all the NIR nodes
     for indx, node in enumerate(torch_graph.node_list):
         # Convert the node type to NIR subgraph
         mapped_node = model_map(node.elem)
+        print(mapped_node, node)
 
         if isinstance(mapped_node, nir.NIRGraph):
-            current_node_index = len(nir_nodes)
-            nir_nodes.extend(mapped_node.nodes)
-            indices[node] = indx + len(mapped_node.nodes)
+            for n in mapped_node.nodes:
+                nir_nodes[n.name] = n
             # Add edges from graph
             for x, y in mapped_node.edges:
-                nir_edges.append((x + current_node_index, y + current_node_index))
+                print(x, y)
+                nir_edges.append(x, y)
         else:
-            nir_nodes.append(mapped_node)
-            indices[node] = indx + 1
+            nir_nodes[node.name] = mapped_node
 
         # Add edges from input, if first element
         # TODO: Replace with mapping to input(s)/output(s) of subgraph
         if indx == 0:  # TODO:
-            for sub_index in range(1, len(nir_nodes)):
-                nir_edges.append((0, sub_index))
-
-    outputs = []
+            keys = list(nir_nodes.keys())
+            for k1, k2 in zip(keys[:-1], keys[1:]):
+                nir_edges.append((k1, k2))
 
     # Get all the edges
     for node in torch_graph.node_list:
         for destination in node.outgoing_nodes:
-            nir_edges.append((indices[node], indices[destination]))
+            nir_edges.append((node.name, destination.name))
         if len(node.outgoing_nodes) == 0:
+            out_name = "output"
             output_node = nir.Output(None)
-            outputs.append(output_node)
-            nir_nodes.append(output_node)
-            nir_edges.append((indices[node], len(nir_nodes) - 1))
+            nir_nodes[out_name] = output_node
+            nir_edges.append((node.name, out_name))
 
     return nir.NIRGraph(nir_nodes, nir_edges)

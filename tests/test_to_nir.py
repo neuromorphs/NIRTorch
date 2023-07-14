@@ -13,13 +13,13 @@ def test_extract_single():
         lambda x: nir.Affine(x.weight.detach().numpy(), x.bias.detach().numpy()),
         torch.rand(1, 1),
     )
-    assert g.edges == [(0, 1), (1, 2)]
-    assert isinstance(g.nodes[0], nir.Input)
-    assert np.allclose(g.nodes[0].shape, np.array([1, 1]))
-    assert isinstance(g.nodes[1], nir.Affine)
-    assert np.allclose(g.nodes[1].weight, m.weight.detach().numpy())
-    assert np.allclose(g.nodes[1].bias, m.bias.detach().numpy())
-    assert isinstance(g.nodes[2], nir.Output)
+    assert g.edges == [("input", "model"), ("model", "output")]
+    assert isinstance(g.nodes["input"], nir.Input)
+    assert np.allclose(g.nodes["input"].shape, np.array([1, 1]))
+    assert isinstance(g.nodes["model"], nir.Affine)
+    assert np.allclose(g.nodes["model"].weight, m.weight.detach().numpy())
+    assert np.allclose(g.nodes["model"].bias, m.bias.detach().numpy())
+    assert isinstance(g.nodes["output"], nir.Output)
 
 
 def test_extract_nir_edges():
@@ -39,7 +39,16 @@ def test_extract_nir_edges():
     nir_graph = extract_nir_graph(mymodel, dummy_model_map, sample_data, "mysequential")
 
     assert len(nir_graph.nodes) == 8
-    assert nir_graph.edges == [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7)]
+    print(nir_graph.edges)
+    assert nir_graph.edges == [
+        ("input", "0"),
+        ("0", "1"),
+        ("1", "2"),
+        ("2", "3"),
+        ("3", "4"),
+        ("4", "5"),
+        ("5", "output"),
+    ]
 
 
 class BranchedModel(nn.Module):

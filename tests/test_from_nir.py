@@ -1,5 +1,4 @@
 import nir
-import norse
 import pytest
 import torch
 
@@ -12,10 +11,6 @@ def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
         lin.weight.data = torch.tensor(m.weight, device=device)
         lin.bias.data = torch.tensor(m.bias, device=device)
         return lin
-    if isinstance(m, norse.torch.LIFBoxCell):
-        return nir.LIF(
-            m.p.tau_mem_inv, m.p.v_leak, torch.ones_like(m.p.tau_mem_int), m.p.v_th
-        )
     elif isinstance(m, nir.Input) or isinstance(m, nir.Output):
         return None
     else:
@@ -23,7 +18,7 @@ def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
 
 
 def test_extract_empty():
-    g = nir.NIRGraph([], [])
+    g = nir.NIRGraph({}, [])
     with pytest.raises(ValueError):
         _ = load(g, _torch_model_map)
 
@@ -35,7 +30,7 @@ def test_extract_lin():
     torchlin.weight.data = torch.tensor(lin.weight)
     torchlin.bias.data = torch.tensor(lin.bias)
     y = torchlin(torchlin(x))
-    g = nir.NIRGraph([lin, lin], [(0, 1)])
+    g = nir.NIRGraph({"a": lin, "b": lin}, [("a", "b")])
     m = load(g, _torch_model_map)
     assert isinstance(m.execution_order[0].elem, torch.nn.Linear)
     assert torch.allclose(m.execution_order[0].elem.weight, lin.weight)
