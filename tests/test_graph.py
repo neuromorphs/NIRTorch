@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn as nn
-from norse.torch import LIFCell, SequentialState
+from norse.torch import LIFCell, SequentialState, to_nir as norse_to_nir
 from sinabs.layers import Merge
 
 
@@ -264,3 +264,19 @@ def test_ignore_nodes_parent_model():
 
     with pytest.raises(ValueError):
         new_graph.find_node(my_branched_model)
+
+def test_input_output():
+    from nirtorch.graph import extract_torch_graph
+
+    g = norse_to_nir(NorseStatefulModel(), data)
+    assert len(g.nodes) == 4 # in -> relu -> lif -> out
+    assert len(g.edges) == 3
+    assert False
+
+
+def test_output_shape_when_single_node():
+    import nir
+    from nirtorch import extract_nir_graph
+
+    g = extract_nir_graph(torch.nn.ReLU(), lambda x: nir.Threshold(torch.tensor(0.1)), sample_data=torch.rand((1,))) 
+    g.nodes["output"].shape == torch.Size([1])

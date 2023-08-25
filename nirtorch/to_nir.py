@@ -51,14 +51,12 @@ def extract_nir_graph(
     for indx, node in enumerate(torch_graph.node_list):
         # Convert the node type to NIR subgraph
         mapped_node = model_map(node.elem)
-        print(mapped_node, node)
 
         if isinstance(mapped_node, nir.NIRGraph):
             for n in mapped_node.nodes:
                 nir_nodes[n.name] = n
             # Add edges from graph
             for x, y in mapped_node.edges:
-                print(x, y)
                 nir_edges.append(x, y)
         else:
             nir_nodes[node.name] = mapped_node
@@ -72,11 +70,13 @@ def extract_nir_graph(
 
     # Get all the edges
     for node in torch_graph.node_list:
-        for destination in node.outgoing_nodes:
+        for destination, shape in node.outgoing_nodes.items():
             nir_edges.append((node.name, destination.name))
+
         if len(node.outgoing_nodes) == 0:
             out_name = "output"
-            output_node = nir.Output(None)
+            # Try to find shape of input to the Output node
+            output_node = nir.Output(torch_graph.module_output_shapes[node.elem])
             nir_nodes[out_name] = output_node
             nir_edges.append((node.name, out_name))
 
