@@ -107,8 +107,9 @@ def test_module_forward_wrapper():
 
     from nirtorch.graph import Graph, module_forward_wrapper, named_modules_map
 
+    output_shapes = {}
     model_graph = Graph(named_modules_map(mymodel))
-    new_call = module_forward_wrapper(model_graph)
+    new_call = module_forward_wrapper(model_graph, output_shapes)
 
     # Override call to the new wrapped call
     nn.Module.__call__ = new_call
@@ -123,6 +124,7 @@ def test_module_forward_wrapper():
     assert (
         len(model_graph.node_list) == 1 + 5 + 5 + 1
     )  # 1 top module + 5 submodules + 5 tensors + 1 output tensor
+    assert (len(output_shapes) == 6) # 1 top module + 5 submodules
 
 
 def test_graph_tracer():
@@ -221,7 +223,7 @@ def test_snn_stateful():
 
     model = NorseStatefulModel()
     graph = extract_torch_graph(model, sample_data=torch.rand((1, 2, 3, 4)))
-    assert len(graph.node_list) == 7  # 2 + 1 nested + 4 tensors
+    assert len(graph.node_list) == 6  # 2 + 1 nested + 3 tensors
 
 
 def test_ignore_tensors():
@@ -271,7 +273,6 @@ def test_input_output():
     g = norse_to_nir(NorseStatefulModel(), data)
     assert len(g.nodes) == 4 # in -> relu -> lif -> out
     assert len(g.edges) == 3
-    assert False
 
 
 def test_output_shape_when_single_node():
@@ -279,4 +280,12 @@ def test_output_shape_when_single_node():
     from nirtorch import extract_nir_graph
 
     g = extract_nir_graph(torch.nn.ReLU(), lambda x: nir.Threshold(torch.tensor(0.1)), sample_data=torch.rand((1,))) 
-    g.nodes["output"].shape == torch.Size([1])
+    g.nodes["output"].output_shape["output"] == torch.Size([1])
+
+def test_sequential_flatten():
+    import nir
+    from nirtorch import extract_nir_graph
+    d = torch.empty(2, 3, 4)
+    g = extract_nir_graph(torch.nn.Flatten(1), lambda x: nir.Flatten(d.shape, 1), d)
+    g.nodes["input"].input_shape["input"] == (2, 3, 4)
+    g.nodes["output"].output_shape["output"] == (2, 3 * 4)

@@ -15,7 +15,7 @@ def test_extract_single():
     )
     assert g.edges == [("input", "model"), ("model", "output")]
     assert isinstance(g.nodes["input"], nir.Input)
-    assert np.allclose(g.nodes["input"].shape, np.array([1, 1]))
+    assert np.allclose(g.nodes["input"].input_shape["input"], np.array([1, 1]))
     assert isinstance(g.nodes["model"], nir.Affine)
     assert np.allclose(g.nodes["model"].weight, m.weight.detach().numpy())
     assert np.allclose(g.nodes["model"].bias, m.bias.detach().numpy())

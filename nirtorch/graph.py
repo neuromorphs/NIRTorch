@@ -26,7 +26,8 @@ def named_modules_map(
             continue
         modules_map[mod] = name
     if model_name is None:
-        del modules_map[model]
+        if model in modules_map:
+            del modules_map[model]
     else:
         modules_map[model] = model_name
     return modules_map
