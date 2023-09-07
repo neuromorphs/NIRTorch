@@ -67,10 +67,10 @@ class NorseStatefulModel(nn.Module):
         return out2
 
 
-input_shape = (2, 28, 28)
+input_type = (2, 28, 28)
 batch_size = 1
 
-data = torch.ones((batch_size, *input_shape))
+data = torch.ones((batch_size, *input_type))
 
 my_branched_model = SinabsBranchedModel()
 
@@ -107,9 +107,9 @@ def test_module_forward_wrapper():
 
     from nirtorch.graph import Graph, module_forward_wrapper, named_modules_map
 
-    output_shapes = {}
+    output_types = {}
     model_graph = Graph(named_modules_map(mymodel))
-    new_call = module_forward_wrapper(model_graph, output_shapes)
+    new_call = module_forward_wrapper(model_graph, output_types)
 
     # Override call to the new wrapped call
     nn.Module.__call__ = new_call
@@ -124,7 +124,7 @@ def test_module_forward_wrapper():
     assert (
         len(model_graph.node_list) == 1 + 5 + 5 + 1
     )  # 1 top module + 5 submodules + 5 tensors + 1 output tensor
-    assert (len(output_shapes) == 6) # 1 top module + 5 submodules
+    assert (len(output_types) == 6) # 1 top module + 5 submodules
 
 
 def test_graph_tracer():
@@ -275,17 +275,17 @@ def test_input_output():
     assert len(g.edges) == 3
 
 
-def test_output_shape_when_single_node():
+def test_output_type_when_single_node():
     import nir
     from nirtorch import extract_nir_graph
 
     g = extract_nir_graph(torch.nn.ReLU(), lambda x: nir.Threshold(torch.tensor(0.1)), sample_data=torch.rand((1,))) 
-    g.nodes["output"].output_shape["output"] == torch.Size([1])
+    g.nodes["output"].output_type["output"] == torch.Size([1])
 
 def test_sequential_flatten():
     import nir
     from nirtorch import extract_nir_graph
     d = torch.empty(2, 3, 4)
     g = extract_nir_graph(torch.nn.Flatten(1), lambda x: nir.Flatten(d.shape, 1), d)
-    g.nodes["input"].input_shape["input"] == (2, 3, 4)
-    g.nodes["output"].output_shape["output"] == (2, 3 * 4)
+    g.nodes["input"].input_type["input"] == (2, 3, 4)
+    g.nodes["output"].output_type["output"] == (2, 3 * 4)

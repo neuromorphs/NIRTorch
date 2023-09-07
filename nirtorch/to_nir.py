@@ -76,7 +76,7 @@ def extract_nir_graph(
         if len(node.outgoing_nodes) == 0:
             out_name = "output"
             # Try to find shape of input to the Output node
-            output_node = nir.Output(torch_graph.module_output_shapes[node.elem])
+            output_node = nir.Output(torch_graph.module_output_types[node.elem])
             nir_nodes[out_name] = output_node
             nir_edges.append((node.name, out_name))
 

@@ -69,11 +69,11 @@ class Graph:
     def __init__(
         self,
         module_names: Dict[nn.Module, str],
-        module_output_shapes: Dict[nn.Module, torch.Tensor] = {}
+        module_output_types: Dict[nn.Module, torch.Tensor] = {}
     ) -> None:
         self.module_names = module_names
         self.node_list: List[Node] = []
-        self.module_output_shapes = module_output_shapes
+        self.module_output_types = module_output_types
         self._last_used_tensor_id = None
         # Add modules to node_list
         for mod, name in self.module_names.items():
@@ -184,7 +184,7 @@ class Graph:
             return False
 
     def populate_from(self, other_graph: "Graph"):
-        self.module_output_shapes.update(other_graph.module_output_shapes)
+        self.module_output_types.update(other_graph.module_output_types)
         for node in other_graph.node_list:
             for outgoing_node, shape in node.outgoing_nodes.items():
                 self.add_edge(node.elem, outgoing_node.elem, shape)
@@ -237,7 +237,7 @@ graph TD;
             if mod not in sub_modules_to_ignore:
                 new_named_modules[mod] = name
         # Create a new graph with the allowed modules
-        new_graph = Graph(new_named_modules, self.module_output_shapes)
+        new_graph = Graph(new_named_modules, self.module_output_types)
         new_graph.populate_from(self)
         return new_graph
 
@@ -272,7 +272,7 @@ graph TD;
         }
 
         # Generate the new graph with the filtered module names
-        graph = Graph(new_module_names, self.module_output_shapes)
+        graph = Graph(new_module_names, self.module_output_types)
         # Iterate over all the nodes
         for node in self.node_list:
             if isinstance(node.elem, class_type):
@@ -317,17 +317,17 @@ _torch_module_call = torch.nn.Module.__call__
 
 
 def module_forward_wrapper(
-    model_graph: Graph, output_shapes: Dict[nn.Module, torch.Tensor]
+    model_graph: Graph, output_types: Dict[nn.Module, torch.Tensor]
 ) -> Callable[..., Any]:
     def my_forward(mod: nn.Module, *args, **kwargs) -> Any:
         out = _torch_module_call(mod, *args, **kwargs)
 
         if isinstance(out, tuple):
             out_tuple = (out[0],)
-            output_shapes[mod] = out[0].shape
+            output_types[mod] = out[0].shape
         elif isinstance(out, torch.Tensor):
             out_tuple = (out,)
-            output_shapes[mod] = out.shape
+            output_types[mod] = out.shape
         else:
             raise Exception("Unknown output format")
 
@@ -368,12 +368,12 @@ class GraphTracer:
 
     def __init__(self, mod: nn.Module) -> None:
         self.original_torch_call = nn.Module.__call__
-        self.output_shapes = {}
-        self.graph = Graph(mod, self.output_shapes)
+        self.output_types = {}
+        self.graph = Graph(mod, self.output_types)
 
     def __enter__(self) -> "GraphTracer":
         # Override the torch call method
-        nn.Module.__call__ = module_forward_wrapper(self.graph, self.output_shapes)
+        nn.Module.__call__ = module_forward_wrapper(self.graph, self.output_types)
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
