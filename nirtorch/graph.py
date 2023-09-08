@@ -69,7 +69,7 @@ class Graph:
     def __init__(
         self,
         module_names: Dict[nn.Module, str],
-        module_output_types: Dict[nn.Module, torch.Tensor] = {}
+        module_output_types: Dict[nn.Module, torch.Tensor] = {},
     ) -> None:
         self.module_names = module_names
         self.node_list: List[Node] = []

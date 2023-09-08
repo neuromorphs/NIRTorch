@@ -124,7 +124,7 @@ def test_module_forward_wrapper():
     assert (
         len(model_graph.node_list) == 1 + 5 + 5 + 1
     )  # 1 top module + 5 submodules + 5 tensors + 1 output tensor
-    assert (len(output_types) == 6) # 1 top module + 5 submodules
+    assert len(output_types) == 6  # 1 top module + 5 submodules
 
 
 def test_graph_tracer():
@@ -267,11 +267,10 @@ def test_ignore_nodes_parent_model():
     with pytest.raises(ValueError):
         new_graph.find_node(my_branched_model)
 
-def test_input_output():
-    from nirtorch.graph import extract_torch_graph
 
+def test_input_output():
     g = norse_to_nir(NorseStatefulModel(), data)
-    assert len(g.nodes) == 4 # in -> relu -> lif -> out
+    assert len(g.nodes) == 4  # in -> relu -> lif -> out
     assert len(g.edges) == 3
 
 
@@ -279,12 +278,18 @@ def test_output_type_when_single_node():
     import nir
     from nirtorch import extract_nir_graph
 
-    g = extract_nir_graph(torch.nn.ReLU(), lambda x: nir.Threshold(torch.tensor(0.1)), sample_data=torch.rand((1,))) 
+    g = extract_nir_graph(
+        torch.nn.ReLU(),
+        lambda x: nir.Threshold(torch.tensor(0.1)),
+        sample_data=torch.rand((1,)),
+    )
     g.nodes["output"].output_type["output"] == torch.Size([1])
+
 
 def test_sequential_flatten():
     import nir
     from nirtorch import extract_nir_graph
+
     d = torch.empty(2, 3, 4)
     g = extract_nir_graph(torch.nn.Flatten(1), lambda x: nir.Flatten(d.shape, 1), d)
     g.nodes["input"].input_type["input"] == (2, 3, 4)

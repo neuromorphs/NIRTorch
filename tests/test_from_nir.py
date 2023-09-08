@@ -27,7 +27,7 @@ def test_extract_lin():
     x = torch.randn(1, 1)
     lin = nir.Affine(x, torch.randn(1, 1))
     torchlin = torch.nn.Linear(1, 1)
-    torchlin.weight.data= torch.nn.Parameter(lin.weight)
+    torchlin.weight.data = torch.nn.Parameter(lin.weight)
     torchlin.bias.data = torch.nn.Parameter(lin.bias)
     y = torchlin(torchlin(x))
     g = nir.NIRGraph({"a": lin, "b": lin}, [("a", "b")])
