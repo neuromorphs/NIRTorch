@@ -3,7 +3,6 @@ requires = ["setuptools"]
 
 [project]
 name = "nirtorch"
-version = "0.2.0"
 description = "Neuromorphic Intermediate Representation"
 authors = [
   { name = "Steven Abreu", email = "s.abreu@rug.nl" },
@@ -29,3 +28,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [ "torch", "nir" ]
+dynamic = ["version"] # Version number read from __init__.py
+
+[tool.setuptools.dynamic]
+version = {attr = "nir.__version__"}
