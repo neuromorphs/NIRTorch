@@ -8,8 +8,8 @@ from nirtorch.from_nir import load
 def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
     if isinstance(m, nir.Affine):
         lin = torch.nn.Linear(*m.weight.shape[-2:])
-        lin.weight.data = torch.tensor(m.weight, device=device)
-        lin.bias.data = torch.tensor(m.bias, device=device)
+        lin.weight.data = torch.nn.Parameter(m.weight.to(device))
+        lin.bias.data = torch.nn.Parameter(m.bias.to(device))
         return lin
     elif isinstance(m, nir.Input) or isinstance(m, nir.Output):
         return None
@@ -27,8 +27,8 @@ def test_extract_lin():
     x = torch.randn(1, 1)
     lin = nir.Affine(x, torch.randn(1, 1))
     torchlin = torch.nn.Linear(1, 1)
-    torchlin.weight.data = torch.tensor(lin.weight)
-    torchlin.bias.data = torch.tensor(lin.bias)
+    torchlin.weight.data = torch.nn.Parameter(lin.weight)
+    torchlin.bias.data = torch.nn.Parameter(lin.bias)
     y = torchlin(torchlin(x))
     g = nir.NIRGraph({"a": lin, "b": lin}, [("a", "b")])
     m = load(g, _torch_model_map)
