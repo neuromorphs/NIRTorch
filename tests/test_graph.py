@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn as nn
-from norse.torch import LIFCell, SequentialState, to_nir as norse_to_nir
+from norse.torch import LIFCell, SequentialState
 from sinabs.layers import Merge
 
 
@@ -269,6 +269,8 @@ def test_ignore_nodes_parent_model():
 
 
 def test_input_output():
+    from norse.torch import to_nir as norse_to_nir
+
     g = norse_to_nir(NorseStatefulModel(), data)
     assert len(g.nodes) == 4  # in -> relu -> lif -> out
     assert len(g.edges) == 3
