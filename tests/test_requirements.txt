@@ -2,5 +2,5 @@ pytest
 torch
 nir
 ruff
-norse
+git+https://github.com/norse/norse
 sinabs

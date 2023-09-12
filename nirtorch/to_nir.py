@@ -53,11 +53,16 @@ def extract_nir_graph(
         mapped_node = model_map(node.elem)
 
         if isinstance(mapped_node, nir.NIRGraph):
-            for n in mapped_node.nodes:
-                nir_nodes[n.name] = n
+            for k, v in mapped_node.nodes.items():
+                # For now, we add nodes in subgraphs to the top-level node list
+                # TODO: Parse graphs recursively
+                if isinstance(v, nir.NIRNode):
+                    nir_nodes[f"{node.name}.{k}"] = v
+                else:
+                    nir_nodes[n.name] = n
             # Add edges from graph
             for x, y in mapped_node.edges:
-                nir_edges.append(x, y)
+                nir_edges.append((f"{node.name}.{x}", f"{node.name}.{y}"))
         else:
             nir_nodes[node.name] = mapped_node
 
@@ -79,5 +84,8 @@ def extract_nir_graph(
             output_node = nir.Output(torch_graph.module_output_types[node.elem])
             nir_nodes[out_name] = output_node
             nir_edges.append((node.name, out_name))
+
+    # Remove duplicate edges
+    nir_edges = list(set(nir_edges))
 
     return nir.NIRGraph(nir_nodes, nir_edges)
