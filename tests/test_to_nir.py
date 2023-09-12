@@ -3,8 +3,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-import norse
-
 from nirtorch.to_nir import extract_nir_graph
 
 
@@ -83,19 +81,18 @@ def test_extract_multiple_explicit():
     g = extract_nir_graph(model, extractor, torch.rand(1))
     print([type(n) for n in g.nodes])
     assert len(g.nodes) == 7
-    assert len(g.edges) == 8 # in + 5 + 1 + out
-
+    assert len(g.edges) == 8  # in + 5 + 1 + out
 
 
 def test_extract_recursive():
     class RecursiveModel(torch.nn.Module):
-
-        def forward(self, x, s = None):
+        def forward(self, x, s=None):
             if s is None:
                 s = torch.zeros_like(x)
             return x + 1, s + x
-    
+
     model = RecursiveModel()
+
     def extractor(m):
         if isinstance(m, RecursiveModel):
             return nir.Delay(np.array([1]))
@@ -104,7 +101,7 @@ def test_extract_recursive():
     assert set(g.edges) == {
         ("input", "model"),
         ("model", "output"),
-        #("model", "model") TODO: Detect and add recursive connections
+        # ("model", "model") TODO: Detect and add recursive connections
     }
 
 
@@ -130,4 +127,3 @@ def test_extract_recursive():
 #     assert len(graph.nodes) == 4
 #     assert len(graph.edges) == 3
 #     assert graph.edges[0] == (0, 1)
-

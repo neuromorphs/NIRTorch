@@ -59,7 +59,7 @@ def extract_nir_graph(
                 if isinstance(v, nir.NIRNode):
                     nir_nodes[f"{node.name}.{k}"] = v
                 else:
-                    nir_nodes[n.name] = n
+                    nir_nodes[v.name] = v
             # Add edges from graph
             for x, y in mapped_node.edges:
                 nir_edges.append((f"{node.name}.{x}", f"{node.name}.{y}"))
