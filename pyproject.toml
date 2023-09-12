@@ -31,4 +31,4 @@ dependencies = [ "torch", "nir" ]
 dynamic = ["version"] # Version number read from __init__.py
 
 [tool.setuptools.dynamic]
-version = {attr = "nir.__version__"}
+version = {attr = "nirtorch.__version__"}
