@@ -63,6 +63,8 @@ class GraphExecutor(nn.Module):
         # NOTE: This logic is not yet consistent for models with multiple input nodes
         for node in self.execution_order:
             input_nodes = self.graph.find_source_nodes_of(node)
+            if node.elem is None:
+                continue
             if len(input_nodes) == 0:
                 # This is the root node
                 outs[node.name] = node.elem(data)
