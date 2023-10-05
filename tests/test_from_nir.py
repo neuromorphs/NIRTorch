@@ -1,4 +1,5 @@
 import nir
+import numpy as np
 import pytest
 import torch
 
@@ -8,8 +9,12 @@ from nirtorch.from_nir import load
 def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
     if isinstance(m, nir.Affine):
         lin = torch.nn.Linear(*m.weight.shape[-2:])
-        lin.weight.data = torch.nn.Parameter(m.weight.to(device))
-        lin.bias.data = torch.nn.Parameter(m.bias.to(device))
+        lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).to(device))
+        lin.bias.data = torch.nn.Parameter(torch.tensor(m.bias).to(device))
+        return lin
+    elif isinstance(m, nir.Linear):
+        lin = torch.nn.Linear(*m.weight.shape[-2:], bias=False)
+        lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).to(device))
         return lin
     elif isinstance(m, nir.Input) or isinstance(m, nir.Output):
         return None
@@ -36,3 +41,17 @@ def test_extract_lin():
     assert torch.allclose(m.execution_order[0].elem.weight, lin.weight)
     assert torch.allclose(m.execution_order[0].elem.bias, lin.bias)
     assert torch.allclose(m(x), y)
+
+def test_extrac_recurrent():
+    w = np.random.randn(1, 1)
+    g = nir.NIRGraph(
+        nodes={"in": nir.Input(np.ones(1)), "a": nir.Linear(w), "b": nir.Linear(w)},
+        edges=[("in", "a"), ("a", "b"), ("b", "a")]
+    )
+    l1 = torch.nn.Linear(1, 1, bias=False)
+    l1.weight.data = torch.tensor(w)
+    l2 = torch.nn.Linear(1, 1, bias=False)
+    l2.weight.data = torch.tensor(w)
+    m = load(g, _torch_model_map)
+    data = torch.randn(1, 1, dtype=torch.float64)
+    torch.allclose(m(data), l2(l1(data)))

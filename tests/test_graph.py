@@ -1,8 +1,11 @@
 import pytest
 import torch
 import torch.nn as nn
-from norse.torch import LIFCell, SequentialState
+from norse.torch import LIBoxCell, LIFCell, SequentialState
 from sinabs.layers import Merge
+
+import nir
+from nirtorch import extract_nir_graph, extract_torch_graph
 
 
 class TupleModule(torch.nn.Module):
@@ -11,8 +14,6 @@ class TupleModule(torch.nn.Module):
 
 
 def test_sequential_graph_extract():
-    from nirtorch.graph import extract_torch_graph
-
     model = nn.Sequential(
         nn.Conv2d(2, 8, 3),
         nn.AvgPool2d(2),
@@ -219,24 +220,18 @@ def test_snn_branched():
 
 
 def test_snn_stateful():
-    from nirtorch.graph import extract_torch_graph
-
     model = NorseStatefulModel()
     graph = extract_torch_graph(model, sample_data=torch.rand((1, 2, 3, 4)))
     assert len(graph.node_list) == 6  # 2 + 1 nested + 3 tensors
 
 
 def test_ignore_tensors():
-    from nirtorch.graph import extract_torch_graph
-
     graph = extract_torch_graph(my_branched_model, sample_data=data)
     mod_only_graph = graph.ignore_tensors()
     assert len(mod_only_graph.node_list) == 6
 
 
 def test_root_has_no_source():
-    from nirtorch.graph import extract_torch_graph
-
     graph = extract_torch_graph(my_branched_model, sample_data=data)
     graph = graph.ignore_tensors()
     assert (
@@ -245,8 +240,6 @@ def test_root_has_no_source():
 
 
 def test_get_root():
-    from nirtorch.graph import extract_torch_graph
-
     graph = extract_torch_graph(my_branched_model, sample_data=data, model_name=None)
     graph = graph.ignore_tensors()
     root_nodes = graph.get_root()
@@ -255,8 +248,6 @@ def test_get_root():
 
 
 def test_ignore_nodes_parent_model():
-    from nirtorch.graph import extract_torch_graph
-
     graph = extract_torch_graph(
         my_branched_model, sample_data=data, model_name="ShouldDisappear"
     )
@@ -277,9 +268,6 @@ def test_input_output():
 
 
 def test_output_type_when_single_node():
-    import nir
-    from nirtorch import extract_nir_graph
-
     g = extract_nir_graph(
         torch.nn.ReLU(),
         lambda x: nir.Threshold(torch.tensor(0.1)),
@@ -289,10 +277,53 @@ def test_output_type_when_single_node():
 
 
 def test_sequential_flatten():
-    import nir
-    from nirtorch import extract_nir_graph
-
     d = torch.empty(2, 3, 4)
     g = extract_nir_graph(torch.nn.Flatten(1), lambda x: nir.Flatten(d.shape, 1), d)
     g.nodes["input"].input_type["input"] == (2, 3, 4)
     g.nodes["output"].output_type["output"] == (2, 3 * 4)
+
+
+@pytest.mark.skip(reason="Not supported yet")
+def test_captures_recurrence_automatically():
+    class Recmodel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.r = LIBoxCell()
+            self.l = torch.nn.Linear(1, 1)
+
+        def forward(self, x, state=None):
+            if state is None:
+                state = [None, torch.zeros_like(x)]
+            s1, s2 = state  # s1 = LIF, s2 = recurrence
+            out, s1 = self.r(x + s2, s1)
+            s2 = self.l(out)
+            return out, [s1, s2]
+
+    from norse.torch.utils.export_nir import _extract_norse_module
+
+    m = Recmodel()
+    data = torch.randn((1, 1))
+    actual, actual_state = m(*m(data))
+    d = extract_nir_graph(m, _extract_norse_module, data)
+    assert d.nodes.keys() == {"input", "l", "r", "output"}
+    assert set(d.edges) == {("input", "r"), ("r", "l"), ("l", "output"), ("r", "r")}
+
+
+def test_captures_recurrence_manually():
+    def export_affine_rec_gru(module):
+        if isinstance(module, torch.nn.Linear):
+            return nir.Affine(module.weight, module.bias)
+        elif isinstance(module, torch.nn.ReLU):
+            return nir.NIRGraph(nodes={"i": nir.I(torch.randn(1))}, edges=[("i", "i")])
+        else:
+            raise ValueError(f"Unsupported module {module}")
+
+    m = torch.nn.Sequential(torch.nn.Linear(1, 1), torch.nn.ReLU())
+    data = torch.randn((1, 1))
+
+    d = extract_nir_graph(m, export_affine_rec_gru, data)
+    assert d.nodes.keys() == {"input", "0", "1.i", "output"}
+    assert set(d.edges) == {("input", "0"), ("0", "1"), ("1.i", "1.i"), ("1", "output")}
+    # TODO: Pass recursively
+    # assert d.nodes["1"].nodes.keys() == {"i"}
+    # assert d.nodes["1"].edges == [("1.i", "1.i")]

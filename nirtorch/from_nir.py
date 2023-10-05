@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import Callable, Dict, List, Optional
 
 import nir
 import torch
@@ -8,7 +8,10 @@ from .graph import Graph, Node
 
 
 def execution_order_up_to_node(
-    node: Node, graph: Graph, execution_order: List[Node]
+    node: Node,
+    graph: Graph,
+    execution_order: List[Node],
+    visited: Optional[Dict[Node, bool]] = None,
 ) -> List[Node]:
     """Recursive function to evaluate execution order until a given node.
 
@@ -20,14 +23,25 @@ def execution_order_up_to_node(
     Returns:
         List[Node]: Execution order
     """
+    if visited is None:
+        visited = {n: False for n in graph.node_list}
+    is_recursive = False
     if len(execution_order) == list(graph.node_list):
         # All nodes are executed
         return execution_order
     for parent in graph.find_source_nodes_of(node):
-        if parent not in execution_order:
-            execution_order = execution_order_up_to_node(parent, graph, execution_order)
-    # Finally since all parents are known and executed
-    return execution_order + [node]
+        if parent not in execution_order and not visited[parent]:
+            visited[parent] = True
+            execution_order = execution_order_up_to_node(
+                parent, graph, execution_order, visited
+            )
+        if node in parent.outgoing_nodes:
+            is_recursive = True
+    # Ensure we're not re-adding a recursive node
+    if is_recursive and node in execution_order:
+        return execution_order
+    else:  # Finally since all parents are known and executed
+        return execution_order + [node]
 
 
 class GraphExecutor(nn.Module):
@@ -63,7 +77,9 @@ class GraphExecutor(nn.Module):
         # NOTE: This logic is not yet consistent for models with multiple input nodes
         for node in self.execution_order:
             input_nodes = self.graph.find_source_nodes_of(node)
-            if len(input_nodes) == 0:
+            if node.elem is None:
+                continue
+            if len(input_nodes) == 0 or len(outs) == 0:
                 # This is the root node
                 outs[node.name] = node.elem(data)
             else:
