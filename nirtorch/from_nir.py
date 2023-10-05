@@ -8,7 +8,10 @@ from .graph import Graph, Node
 
 
 def execution_order_up_to_node(
-    node: Node, graph: Graph, execution_order: List[Node], visited: Optional[Dict[Node, bool]] = None
+    node: Node,
+    graph: Graph,
+    execution_order: List[Node],
+    visited: Optional[Dict[Node, bool]] = None,
 ) -> List[Node]:
     """Recursive function to evaluate execution order until a given node.
 
@@ -29,13 +32,15 @@ def execution_order_up_to_node(
     for parent in graph.find_source_nodes_of(node):
         if parent not in execution_order and not visited[parent]:
             visited[parent] = True
-            execution_order = execution_order_up_to_node(parent, graph, execution_order, visited)
+            execution_order = execution_order_up_to_node(
+                parent, graph, execution_order, visited
+            )
         if node in parent.outgoing_nodes:
             is_recursive = True
     # Ensure we're not re-adding a recursive node
     if is_recursive and node in execution_order:
         return execution_order
-    else: # Finally since all parents are known and executed
+    else:  # Finally since all parents are known and executed
         return execution_order + [node]
 
 
