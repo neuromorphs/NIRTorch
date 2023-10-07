@@ -28,6 +28,12 @@ def test_extract_empty():
         _ = load(g, _torch_model_map)
 
 
+def test_extract_illegal_name():
+    graph = nir.NIRGraph({"a.b": nir.Input(np.ones(1))}, [])
+    torch_graph = load(graph, _torch_model_map)
+    assert "a_b" in torch_graph._modules
+
+
 def test_extract_lin():
     x = torch.randn(1, 1)
     lin = nir.Affine(x, torch.randn(1, 1))
@@ -42,11 +48,12 @@ def test_extract_lin():
     assert torch.allclose(m.execution_order[0].elem.bias, lin.bias)
     assert torch.allclose(m(x), y)
 
+
 def test_extrac_recurrent():
     w = np.random.randn(1, 1)
     g = nir.NIRGraph(
         nodes={"in": nir.Input(np.ones(1)), "a": nir.Linear(w), "b": nir.Linear(w)},
-        edges=[("in", "a"), ("a", "b"), ("b", "a")]
+        edges=[("in", "a"), ("a", "b"), ("b", "a")],
     )
     l1 = torch.nn.Linear(1, 1, bias=False)
     l1.weight.data = torch.tensor(w)
