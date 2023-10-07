@@ -27,6 +27,10 @@ def test_extract_empty():
     with pytest.raises(ValueError):
         _ = load(g, _torch_model_map)
 
+def test_extract_illegal_name():
+    graph = nir.NIRGraph({"a.b": nir.Input(np.ones(1))}, [])
+    torch_graph = load(graph, _torch_model_map)
+    assert "a_b" in torch_graph._modules
 
 def test_extract_lin():
     x = torch.randn(1, 1)

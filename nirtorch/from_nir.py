@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 
 from .graph import Graph, Node
+from .utils import sanitize_name
 
 
 def execution_order_up_to_node(
@@ -66,7 +67,7 @@ class GraphExecutor(nn.Module):
 
     def instantiate_modules(self):
         for mod, name in self.graph.module_names.items():
-            self.add_module(name, mod)
+            self.add_module(sanitize_name(name), mod)
 
     def get_input_nodes(self) -> List[Node]:
         # NOTE: This is a hack. Should use the input nodes from NIR graph
