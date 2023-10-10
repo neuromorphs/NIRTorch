@@ -1,4 +1,5 @@
-from typing import Callable, Dict, List, Optional
+import inspect
+from typing import Callable, Dict, List, Optional, NamedTuple, Any
 
 import nir
 import torch
@@ -49,10 +50,16 @@ class GraphExecutor(nn.Module):
     def __init__(self, graph: Graph) -> None:
         super().__init__()
         self.graph = graph
+        self.stateful_modules = {}
         self.instantiate_modules()
         self.execution_order = self.get_execution_order()
         if len(self.execution_order) == 0:
             raise ValueError("Graph is empty")
+
+    def _is_module_stateful(self, module: torch.nn.Module) -> bool:
+        signature = inspect.signature(module.forward)
+        arguments = len(signature.parameters)
+        return arguments > 1
 
     def get_execution_order(self) -> List[Node]:
         """Evaluate the execution order and instantiate that as a list."""
@@ -67,13 +74,32 @@ class GraphExecutor(nn.Module):
 
     def instantiate_modules(self):
         for mod, name in self.graph.module_names.items():
-            self.add_module(sanitize_name(name), mod)
+            if mod is not None:
+                self.add_module(sanitize_name(name), mod)
+                self.stateful_modules[sanitize_name(name)] = self._is_module_stateful(
+                    mod
+                )
 
     def get_input_nodes(self) -> List[Node]:
         # NOTE: This is a hack. Should use the input nodes from NIR graph
         return self.graph.get_root()
 
-    def forward(self, data: torch.Tensor):
+    def _apply_module(
+        self, node: Node, x: torch.Tensor, state: Optional[Dict[str, Any]]
+    ):
+        """Applies a module and keeps track of its state.
+        TODO: Use pytree to recursively construct the state
+        """
+        if node.name in self.stateful_modules and node.name in state:
+            out = node.elem(x, *state[node.name])
+        else:
+            out = node.elem(x)
+        if self.stateful_modules[node.name]:
+            state[node.name] = out[1:]
+            out = out[0]
+        return out
+
+    def forward(self, data: torch.Tensor, state: Optional[Dict[str, Any]] = {}):
         outs = {}
         # NOTE: This logic is not yet consistent for models with multiple input nodes
         for node in self.execution_order:
@@ -82,11 +108,14 @@ class GraphExecutor(nn.Module):
                 continue
             if len(input_nodes) == 0 or len(outs) == 0:
                 # This is the root node
-                outs[node.name] = node.elem(data)
+                outs[node.name] = self._apply_module(node, data, state)
             else:
                 # Intermediate nodes
-                input_data = (outs[node.name] for node in input_nodes)
-                outs[node.name] = node.elem(*input_data)
+                input_data = [outs[node.name] for node in input_nodes]
+                input_data = torch.stack(input_data).sum(
+                    0
+                )  # Multiple inputs are summed
+                outs[node.name] = self._apply_module(node, input_data, state)
         return outs[node.name]
 
 

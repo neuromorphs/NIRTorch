@@ -1,7 +1,7 @@
 import nir
 import numpy as np
-import pytest
 import torch
+import pytest
 
 from nirtorch.from_nir import load
 
@@ -29,7 +29,7 @@ def test_extract_empty():
 
 
 def test_extract_illegal_name():
-    graph = nir.NIRGraph({"a.b": nir.Input(np.ones(1))}, [])
+    graph = nir.NIRGraph({"a.b": nir.Linear(np.ones((1, 1)))}, [])
     torch_graph = load(graph, _torch_model_map)
     assert "a_b" in torch_graph._modules
 
@@ -62,3 +62,22 @@ def test_extrac_recurrent():
     m = load(g, _torch_model_map)
     data = torch.randn(1, 1, dtype=torch.float64)
     torch.allclose(m(data), l2(l1(data)))
+
+
+def test_execute_stateful():
+    class StatefulModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+        def forward(self, x, state=None):
+            if state is None:
+                state = 1
+            return x + state, state
+
+    g = nir.NIRGraph(
+        nodes={"li": nir.Flatten(np.array([1])), "li2": nir.Flatten(np.array([1]))},
+        edges=[("li", "li2")],
+    )  # Mock node
+    m = load(g, lambda m: StatefulModel())
+    out = m(torch.ones(10))
+    assert torch.allclose(out, torch.ones(10) * 3)

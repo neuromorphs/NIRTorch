@@ -5,6 +5,8 @@ from typing import Any, Callable, Dict, List, Optional, Type, Union
 import torch
 import torch.nn as nn
 
+from .utils import sanitize_name
+
 
 def named_modules_map(
     model: nn.Module, model_name: Optional[str] = "model"
@@ -41,7 +43,7 @@ class Node:
         outgoing_nodes: Optional[Dict["Node", torch.Tensor]] = None,
     ) -> None:
         self.elem = elem
-        self.name = name
+        self.name = sanitize_name(name)
         if not outgoing_nodes:
             self.outgoing_nodes = {}
         else:
