@@ -116,7 +116,10 @@ class GraphExecutor(nn.Module):
                     0
                 )  # Multiple inputs are summed
                 outs[node.name] = self._apply_module(node, input_data, state)
-        return outs[node.name]
+        if len(state) > 0:
+            return outs[node.name], state
+        else:
+            return outs[node.name]
 
 
 def _mod_nir_to_graph(nir_graph: nir.NIRNode) -> Graph:

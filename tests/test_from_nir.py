@@ -79,5 +79,7 @@ def test_execute_stateful():
         edges=[("li", "li2")],
     )  # Mock node
     m = load(g, lambda m: StatefulModel())
-    out = m(torch.ones(10))
+    out, state = m(torch.ones(10))
     assert torch.allclose(out, torch.ones(10) * 3)
+    assert state["li"] == (1, )
+    assert state["li"] == (1, )
