@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Dict, List, Optional, NamedTuple, Any
+from typing import Callable, Dict, List, Optional, Any
 
 import nir
 import torch
