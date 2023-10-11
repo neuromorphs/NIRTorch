@@ -12,6 +12,7 @@ def extract_nir_graph(
     model_map: Callable[[nn.Module], nir.NIRNode],
     sample_data: Any,
     model_name: Optional[str] = "model",
+    ignore_submodules_of=None
 ) -> nir.NIRNode:
     """Given a `model`, generate an NIR representation using the specified `model_map`.
 
@@ -35,6 +36,9 @@ def extract_nir_graph(
     torch_graph = extract_torch_graph(
         model, sample_data=sample_data, model_name=model_name
     ).ignore_tensors()
+
+    if ignore_submodules_of is not None:
+        torch_graph = torch_graph.ignore_submodules_of(ignore_submodules_of)
 
     # Get the root node
     root_nodes = torch_graph.get_root()
