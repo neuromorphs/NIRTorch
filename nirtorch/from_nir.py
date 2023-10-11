@@ -59,7 +59,7 @@ class GraphExecutor(nn.Module):
         execution_order = []
         # Then loop over all nodes and check that they are added to the execution order.
         for node in self.graph.node_list:
-            if node not in execution_order:
+            if node not in execution_order and isinstance(node.elem, nn.Module):
                 execution_order = execution_order_up_to_node(
                     node, self.graph, execution_order
                 )
@@ -67,7 +67,8 @@ class GraphExecutor(nn.Module):
 
     def instantiate_modules(self):
         for mod, name in self.graph.module_names.items():
-            self.add_module(sanitize_name(name), mod)
+            if isinstance(mod, nn.Module):
+                self.add_module(sanitize_name(name), mod)
 
     def get_input_nodes(self) -> List[Node]:
         # NOTE: This is a hack. Should use the input nodes from NIR graph
