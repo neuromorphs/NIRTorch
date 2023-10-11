@@ -1,3 +1,4 @@
+import dataclasses
 import inspect
 from typing import Callable, Dict, List, Optional, Any
 
@@ -46,6 +47,16 @@ def execution_order_up_to_node(
         return execution_order + [node]
 
 
+@dataclasses.dataclass
+class GraphExecutorState:
+    """State for the GraphExecutor that keeps track of both the state of hidden
+    units and caches the output of previous modules, for use in (future) recurrent
+    computations."""
+
+    state: Dict[str, Any] = dataclasses.field(default_factory=dict)
+    cache: Dict[str, Any] = dataclasses.field(default_factory=dict)
+
+
 class GraphExecutor(nn.Module):
     def __init__(self, graph: Graph) -> None:
         super().__init__()
@@ -85,41 +96,65 @@ class GraphExecutor(nn.Module):
         return self.graph.get_root()
 
     def _apply_module(
-        self, node: Node, x: torch.Tensor, state: Optional[Dict[str, Any]]
+        self,
+        node: Node,
+        input_nodes: List[Node],
+        old_state: GraphExecutorState,
+        new_state: GraphExecutorState,
+        data: Optional[torch.Tensor] = None,
     ):
         """Applies a module and keeps track of its state.
         TODO: Use pytree to recursively construct the state
         """
-        if node.name in self.stateful_modules and node.name in state:
-            out = node.elem(x, *state[node.name])
-        else:
-            out = node.elem(x)
-        if self.stateful_modules[node.name]:
-            state[node.name] = out[1:]
-            out = out[0]
-        return out
+        inputs = []
+        # Append state if needed
+        if node.name in self.stateful_modules and node.name in old_state.state:
+            inputs.extend(old_state.state[node.name])
 
-    def forward(self, data: torch.Tensor, state: Optional[Dict[str, Any]] = {}):
-        outs = {}
+        # Sum recurrence if needed
+        summed_inputs = [] if data is None else [data]
+        for input_node in input_nodes:
+            if (
+                input_node.name not in new_state.cache
+                and input_node.name in old_state.cache
+            ):
+                summed_inputs.append(old_state.cache[input_node.name])
+            elif input_node.name in new_state.cache:
+                summed_inputs.append(new_state.cache[input_node.name])
+
+        inputs.insert(
+            0, torch.stack(summed_inputs).sum(0)
+        )  # Insert input, sum if multiple
+
+        out = node.elem(*inputs)
+        # If the module is stateful, we know the output is (at least) a tuple
+        if self.stateful_modules[node.name]:
+            new_state.state[node.name] = out[1:]  # Store the new state
+            out = out[0]
+        return out, new_state
+
+    def forward(
+        self, data: torch.Tensor, old_state: Optional[GraphExecutorState] = None
+    ):
+        if old_state is None:
+            old_state = GraphExecutorState()
+        new_state = GraphExecutorState()
+        first_node = True
         # NOTE: This logic is not yet consistent for models with multiple input nodes
         for node in self.execution_order:
             input_nodes = self.graph.find_source_nodes_of(node)
             if node.elem is None:
                 continue
-            if len(input_nodes) == 0 or len(outs) == 0:
-                # This is the root node
-                outs[node.name] = self._apply_module(node, data, state)
-            else:
-                # Intermediate nodes
-                input_data = [outs[node.name] for node in input_nodes]
-                input_data = torch.stack(input_data).sum(
-                    0
-                )  # Multiple inputs are summed
-                outs[node.name] = self._apply_module(node, input_data, state)
-        if len(state) > 0:
-            return outs[node.name], state
-        else:
-            return outs[node.name]
+            out, new_state = self._apply_module(
+                node, input_nodes, new_state, old_state, data if first_node else None
+            )
+            new_state.cache[node.name] = out
+            first_node = False
+
+        # If the output node is a dummy nir.Output node, use the second-to-last node
+        if node.name not in new_state.cache:
+            node = self.execution_order[-2]
+        return new_state.cache[node.name], new_state
 
 
 def _mod_nir_to_graph(nir_graph: nir.NIRNode) -> Graph:

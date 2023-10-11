@@ -9,12 +9,12 @@ from nirtorch.from_nir import load
 def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
     if isinstance(m, nir.Affine):
         lin = torch.nn.Linear(*m.weight.shape[-2:])
-        lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).to(device))
-        lin.bias.data = torch.nn.Parameter(torch.tensor(m.bias).to(device))
+        lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).to(device).float())
+        lin.bias.data = torch.nn.Parameter(torch.tensor(m.bias).to(device).float())
         return lin
     elif isinstance(m, nir.Linear):
         lin = torch.nn.Linear(*m.weight.shape[-2:], bias=False)
-        lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).to(device))
+        lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).to(device).float())
         return lin
     elif isinstance(m, nir.Input) or isinstance(m, nir.Output):
         return None
@@ -46,22 +46,25 @@ def test_extract_lin():
     assert isinstance(m.execution_order[0].elem, torch.nn.Linear)
     assert torch.allclose(m.execution_order[0].elem.weight, lin.weight)
     assert torch.allclose(m.execution_order[0].elem.bias, lin.bias)
-    assert torch.allclose(m(x), y)
+    assert isinstance(m.execution_order[1].elem, torch.nn.Linear)
+    assert torch.allclose(m.execution_order[1].elem.weight, lin.weight)
+    assert torch.allclose(m.execution_order[1].elem.bias, lin.bias)
+    assert torch.allclose(m(x)[0], y)
 
 
-def test_extrac_recurrent():
+def test_extract_recurrent():
     w = np.random.randn(1, 1)
     g = nir.NIRGraph(
         nodes={"in": nir.Input(np.ones(1)), "a": nir.Linear(w), "b": nir.Linear(w)},
         edges=[("in", "a"), ("a", "b"), ("b", "a")],
     )
     l1 = torch.nn.Linear(1, 1, bias=False)
-    l1.weight.data = torch.tensor(w)
+    l1.weight.data = torch.tensor(w).float()
     l2 = torch.nn.Linear(1, 1, bias=False)
-    l2.weight.data = torch.tensor(w)
+    l2.weight.data = torch.tensor(w).float()
     m = load(g, _torch_model_map)
-    data = torch.randn(1, 1, dtype=torch.float64)
-    torch.allclose(m(data), l2(l1(data)))
+    data = torch.randn(1, 1, dtype=torch.float32)
+    torch.allclose(m(data)[0], l2(l1(data)))
 
 
 def test_execute_stateful():
@@ -81,5 +84,22 @@ def test_execute_stateful():
     m = load(g, lambda m: StatefulModel())
     out, state = m(torch.ones(10))
     assert torch.allclose(out, torch.ones(10) * 3)
-    assert state["li"] == (1, )
-    assert state["li"] == (1, )
+    assert state.state["li"] == (1,)
+    assert state.state["li"] == (1,)
+
+
+def test_execute_recurrent():
+    w = np.ones((1, 1))
+    g = nir.NIRGraph(
+        nodes={"in": nir.Input(np.ones(1)), "a": nir.Linear(w), "b": nir.Linear(w)},
+        edges=[("in", "a"), ("a", "b"), ("b", "a")],
+    )
+    m = load(g, _torch_model_map)
+    data = torch.ones(1, 1)
+
+    # Same execution without reusing state should yield the same result
+    y1 = m(data)
+    y2 = m(data)
+    assert torch.allclose(y1[0], y2[0])
+    out, s = m(*m(data))
+    assert torch.allclose(out, torch.tensor(2.0))
