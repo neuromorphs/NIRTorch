@@ -9,15 +9,15 @@ from nirtorch.from_nir import load
 def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
     if isinstance(m, nir.Affine):
         lin = torch.nn.Linear(*m.weight.shape[-2:])
-        lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).to(device))
-        lin.bias.data = torch.nn.Parameter(torch.tensor(m.bias).to(device))
+        lin.weight.data = torch.tensor(m.weight).to(device)
+        lin.bias.data = torch.tensor(m.bias).to(device)
         return lin
     elif isinstance(m, nir.Linear):
         lin = torch.nn.Linear(*m.weight.shape[-2:], bias=False)
-        lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).to(device))
+        lin.weight.data = torch.tensor(m.weight).to(device)
         return lin
     elif isinstance(m, nir.Input) or isinstance(m, nir.Output):
-        return None
+        return torch.nn.Identity()
     else:
         raise NotImplementedError(f"Unsupported module {m}")
 
