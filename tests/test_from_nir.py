@@ -22,6 +22,33 @@ def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
         raise NotImplementedError(f"Unsupported module {m}")
 
 
+def _recurrent_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
+    class MyCubaLIF(torch.nn.Module):
+        def __init__(self, lif, lin):
+            super().__init__()
+            self.lif = lif
+            self.lin = lin
+
+        def forward(self, x, state=None):
+            if state is None:
+                state = torch.zeros_like(x)
+            z = self.lif(x + state)
+            return self.lin(z), z
+
+    try:
+        return _torch_model_map(m, device)
+    except NotImplementedError:
+        if isinstance(m, nir.CubaLIF):
+            return torch.nn.Identity()
+        elif isinstance(m, nir.NIRGraph):
+            return MyCubaLIF(
+                _recurrent_model_map(m.nodes["lif"], device),
+                _recurrent_model_map(m.nodes["lin"], device),
+            )
+        else:
+            raise NotImplementedError(f"Unsupported module {m}")
+
+
 def test_extract_empty():
     g = nir.NIRGraph({}, [])
     with pytest.raises(ValueError):
@@ -103,3 +130,9 @@ def test_execute_recurrent():
     assert torch.allclose(y1[0], y2[0])
     out, s = m(*m(data))
     assert torch.allclose(out, torch.tensor(2.0))
+
+
+def test_import_braille():
+    g = nir.read("tests/braille.nir")
+    m = load(g, _recurrent_model_map)
+    assert m(torch.empty(1, 12))[0].shape == (1, 7)

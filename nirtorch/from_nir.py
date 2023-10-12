@@ -1,6 +1,6 @@
 import dataclasses
 import inspect
-from typing import Callable, Dict, List, Optional, Any
+from typing import Callable, Dict, List, Optional, Any, Union
 
 import nir
 import torch
@@ -173,18 +173,21 @@ def _switch_models_with_map(
 
 
 def load(
-    nir_graph: nir.NIRNode, model_map: Callable[[nir.NIRNode], nn.Module]
+    nir_graph: Union[nir.NIRNode, str], model_map: Callable[[nir.NIRNode], nn.Module]
 ) -> nn.Module:
-    """Load a NIR object and convert it to a torch module using the given model map.
+    """Load a NIR graph and convert it to a torch module using the given model map.
 
     Args:
-        nir_graph (nir.NIRNode): NIR object
+        nir_graph (Union[nir.NIRNode, str]): The NIR object to load, or a string representing
+            the path to the NIR object.
         model_map (Callable[[nn.NIRNode], nn.Module]): A method that returns the a torch
             module that corresponds to each NIR node.
 
     Returns:
         nn.Module: The generated torch module
     """
+    if isinstance(nir_graph, str):
+        nir_graph = nir.read(nir_graph)
     # Map modules to the target modules using th emodel map
     nir_module_graph = _switch_models_with_map(nir_graph, model_map)
     # Build a nirtorch.Graph based on the nir_graph
