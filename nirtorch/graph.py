@@ -194,11 +194,16 @@ class Graph:
     def __str__(self) -> str:
         return self.to_md()
 
+    def debug_str(self) -> str:
+        debug_str = ""
+        for node in self.node_list:
+            debug_str += f"{node.name} ({node.elem.__class__.__name__})\n"
+            for outgoing, shape in node.outgoing_nodes.items():
+                debug_str += f"\t-> {outgoing.name} ({outgoing.elem.__class__.__name__})\n"
+        return debug_str.strip()
+
     def to_md(self) -> str:
-        mermaid_md = """
-```mermaid
-graph TD;
-"""
+        mermaid_md = """```mermaid\ngraph TD;\n"""
         for node in self.node_list:
             if node.outgoing_nodes:
                 for outgoing, _ in node.outgoing_nodes.items():
@@ -206,10 +211,7 @@ graph TD;
             else:
                 mermaid_md += f"{node.name};\n"
 
-        end = """
-```
-"""
-        return mermaid_md + end
+        return mermaid_md + "\n```\n"
 
     def leaf_only(self) -> "Graph":
         leaf_modules = self.get_leaf_modules()
