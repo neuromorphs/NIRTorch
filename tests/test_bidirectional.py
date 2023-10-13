@@ -28,7 +28,7 @@ def _nir_to_pytorch_module(node: nir.NIRNode) -> torch.nn.Module:
         return torch.nn.Linear(*node.weight.shape)
 
     elif isinstance(node, (nir.LIF, nir.CubaLIF)):
-        return torch.nn.Identity()
+        return torch.nn.Linear(1, 1)
 
     else:
         return None
@@ -83,8 +83,7 @@ def test_nir_to_torch_to_nir(from_file=True):
     module = nirtorch.load(graph, _nir_to_torch_module)
     assert module is not None
     graph2 = nirtorch.extract_nir_graph(module, _torch_to_nir, torch.zeros(1, 1))
-    print('original NIR edges', graph.edges)
-    print('converted NIR edges', graph2.edges)
+    assert sorted(graph.edges) == sorted(graph2.edges)
     assert graph2 is not None
 
 

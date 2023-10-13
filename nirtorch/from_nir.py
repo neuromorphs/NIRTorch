@@ -122,9 +122,15 @@ class GraphExecutor(nn.Module):
             elif input_node.name in new_state.cache:
                 summed_inputs.append(new_state.cache[input_node.name])
 
-        inputs.insert(
-            0, torch.stack(summed_inputs).sum(0)
-        )  # Insert input, sum if multiple
+        if len(input_nodes) == 0 and data is not None:
+            # single input, no need to sum (fix issue #16)
+            inputs.insert(0, data)
+        elif len(input_nodes) == 1:
+            # single input, no need to sum (fix issue #16)
+            inputs.insert(0, summed_inputs[0])
+        else:
+            # multiple inputs, sum them
+            inputs.insert(0, torch.stack(summed_inputs).sum(0))
 
         out = node.elem(*inputs)
         # If the module is stateful, we know the output is (at least) a tuple
