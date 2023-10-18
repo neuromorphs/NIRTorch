@@ -99,8 +99,8 @@ class GraphExecutor(nn.Module):
         self,
         node: Node,
         input_nodes: List[Node],
-        old_state: GraphExecutorState,
         new_state: GraphExecutorState,
+        old_state: GraphExecutorState,
         data: Optional[torch.Tensor] = None,
     ):
         """Applies a module and keeps track of its state.
