@@ -12,7 +12,7 @@ def extract_nir_graph(
     model_map: Callable[[nn.Module], nir.NIRNode],
     sample_data: Any,
     model_name: Optional[str] = "model",
-    ignore_submodules_of=None
+    ignore_submodules_of=None,
 ) -> nir.NIRNode:
     """Given a `model`, generate an NIR representation using the specified `model_map`.
 
@@ -49,7 +49,9 @@ def extract_nir_graph(
 
     # Convert the nodes and get indices
     nir_edges = []
-    nir_nodes = {"input": nir.Input(np.array(sample_data.shape))}
+    nir_nodes = {
+        "input": nir.Input(np.array(sample_data.shape[1:]))
+    }  # Remove the first dimension
 
     # Get all the NIR nodes
     for indx, node in enumerate(torch_graph.node_list):
@@ -85,7 +87,9 @@ def extract_nir_graph(
         if len(node.outgoing_nodes) == 0:
             out_name = "output"
             # Try to find shape of input to the Output node
-            output_node = nir.Output(torch_graph.module_output_types[node.elem])
+            output_node = nir.Output(
+                torch_graph.module_output_types[node.elem][1:]
+            )  # Ignore batch dimension
             nir_nodes[out_name] = output_node
             nir_edges.append((node.name, out_name))
 

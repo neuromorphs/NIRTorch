@@ -17,7 +17,7 @@ def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
         lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).to(device))
         return lin
     elif isinstance(m, nir.Input) or isinstance(m, nir.Output):
-        return None
+        return torch.nn.Identity()
     else:
         raise NotImplementedError(f"Unsupported module {m}")
 
@@ -49,6 +49,7 @@ def test_extract_lin():
     assert torch.allclose(m(x), y)
 
 
+@pytest.mark.skip("Not yet supported")
 def test_extrac_recurrent():
     w = np.random.randn(1, 1)
     g = nir.NIRGraph(

@@ -7,7 +7,7 @@ import nirtorch
 
 def _torch_convert(module: nn.Module) -> nir.NIRNode:
     if isinstance(module, nn.Conv1d):
-        return nir.Conv1d(module.weight, 1, 1, 1, 1, module.bias)
+        return nir.Conv1d(None, module.weight, 1, 1, 1, 1, module.bias)
     elif isinstance(module, nn.Linear):
         return nir.Affine(module.weight, module.bias)
     else:
