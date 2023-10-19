@@ -386,7 +386,7 @@ class GraphTracer:
 
 
 def extract_torch_graph(
-    model: nn.Module, sample_data: Any, model_name: Optional[str] = "model"
+    model: nn.Module, sample_data: Any, model_name: Optional[str] = "model", model_args=[]
 ) -> Graph:
     """Extract computational graph between various modules in the model
     NOTE: This method is not capable of any compute happening outside of module
@@ -409,6 +409,6 @@ def extract_torch_graph(
     with GraphTracer(
         named_modules_map(model, model_name=model_name)
     ) as tracer, torch.no_grad():
-        _ = model(sample_data)
+        _ = model(sample_data, *model_args)
 
     return tracer.graph
