@@ -71,15 +71,19 @@ class Graph:
     def __init__(
         self,
         module_names: Dict[nn.Module, str],
+        inputs: List[str],
         module_output_types: Dict[nn.Module, torch.Tensor] = {},
     ) -> None:
         self.module_names = module_names
         self.node_list: List[Node] = []
         self.module_output_types = module_output_types
         self._last_used_tensor_id = None
+        self.inputs = []
         # Add modules to node_list
         for mod, name in self.module_names.items():
-            self.add_elem(mod, name)
+            node = self.add_elem(mod, name)
+            if name in inputs:
+                self.inputs.append(node)
 
     @property
     def node_map_by_id(self):
@@ -199,7 +203,9 @@ class Graph:
         for node in self.node_list:
             debug_str += f"{node.name} ({node.elem.__class__.__name__})\n"
             for outgoing, shape in node.outgoing_nodes.items():
-                debug_str += f"\t-> {outgoing.name} ({outgoing.elem.__class__.__name__})\n"
+                debug_str += (
+                    f"\t-> {outgoing.name} ({outgoing.elem.__class__.__name__})\n"
+                )
         return debug_str.strip()
 
     def to_md(self) -> str:
@@ -215,7 +221,7 @@ class Graph:
 
     def leaf_only(self) -> "Graph":
         leaf_modules = self.get_leaf_modules()
-        filtered_graph = Graph(leaf_modules)
+        filtered_graph = Graph(leaf_modules, inputs=self.inputs)
         # Populate edges
         filtered_graph.populate_from(self)
         return filtered_graph
@@ -241,7 +247,11 @@ class Graph:
             if mod not in sub_modules_to_ignore:
                 new_named_modules[mod] = name
         # Create a new graph with the allowed modules
-        new_graph = Graph(new_named_modules, self.module_output_types)
+        new_graph = Graph(
+            new_named_modules,
+            inputs=self.inputs,
+            module_output_types=self.module_output_types,
+        )
         new_graph.populate_from(self)
         return new_graph
 
@@ -256,7 +266,7 @@ class Graph:
         """
         source_node_list = []
         for source_node in self.node_list:
-            for outnode, shape in source_node.outgoing_nodes.items():
+            for outnode, _ in source_node.outgoing_nodes.items():
                 if node == outnode:
                     source_node_list.append(source_node)
         return source_node_list
@@ -276,7 +286,11 @@ class Graph:
         }
 
         # Generate the new graph with the filtered module names
-        graph = Graph(new_module_names, self.module_output_types)
+        graph = Graph(
+            new_module_names,
+            inputs=self.inputs,
+            module_output_types=self.module_output_types,
+        )
         # Iterate over all the nodes
         for node in self.node_list:
             if isinstance(node.elem, class_type):
@@ -308,13 +322,7 @@ class Graph:
         Returns:
             List[Node]: A list of root nodes for the graph.
         """
-        roots = []
-        for node in self.node_list:
-            sources = self.find_source_nodes_of(node)
-            # Append root node if it has no sources (and it isn't a sequential module)
-            if len(sources) == 0 and not isinstance(node.elem, torch.nn.Sequential):
-                roots.append(node)
-        return roots
+        return self.inputs
 
 
 _torch_module_call = torch.nn.Module.__call__
@@ -386,7 +394,10 @@ class GraphTracer:
 
 
 def extract_torch_graph(
-    model: nn.Module, sample_data: Any, model_name: Optional[str] = "model", model_args=[]
+    model: nn.Module,
+    sample_data: Any,
+    model_name: Optional[str] = "model",
+    model_args=[],
 ) -> Graph:
     """Extract computational graph between various modules in the model
     NOTE: This method is not capable of any compute happening outside of module
@@ -410,5 +421,10 @@ def extract_torch_graph(
         named_modules_map(model, model_name=model_name)
     ) as tracer, torch.no_grad():
         _ = model(sample_data, *model_args)
+
+    # HACK: The current graph is using copy-constructors, that detaches
+    # the traced output_types from the original graph.
+    # In the future, find a way to synchronize the two representations
+    tracer.graph.module_output_types = tracer.output_types
 
     return tracer.graph

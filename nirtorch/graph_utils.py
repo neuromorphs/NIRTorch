@@ -1,3 +1,8 @@
+from typing import Callable, List, Set, TypeVar
+
+T = TypeVar("T")
+
+
 def find_children(node, edges):
     """Given a node and the edges of a graph, find all direct children of that node."""
     return set(child for (parent, child) in edges if parent == node)
@@ -59,3 +64,23 @@ def find_all_ancestors(
 #
 #     return execution_order
 #
+
+def trace_execution(
+    node: T, edge_fn: Callable[[T], List[T]], visited: Set[T] = None
+) -> List[T]:
+    """Traces the execution of a node by listing them in order, coloring recursive
+    nodes to avoid adding the same node twice.
+    """
+    if visited is None:
+        visited = set()
+
+    if node in visited:
+        return []
+    else:
+        visited.add(node)
+
+    successors = []
+    for child in edge_fn(node):
+        if child not in visited:
+            successors += trace_execution(child, edge_fn, visited)
+    return [node] + successors

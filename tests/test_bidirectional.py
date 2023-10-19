@@ -42,7 +42,9 @@ else:
 
 def _create_torch_model() -> torch.nn.Module:
     if use_snntorch:
-        return torch.nn.Sequential(torch.nn.Linear(1, 1), snn.Leaky(0.9, init_hidden=True))
+        return torch.nn.Sequential(
+            torch.nn.Linear(1, 1), snn.Leaky(0.9, init_hidden=True)
+        )
     else:
         return torch.nn.Sequential(torch.nn.Linear(1, 1), torch.nn.Identity())
 
@@ -57,23 +59,21 @@ def _torch_to_nir(module: torch.nn.Module) -> nir.NIRNode:
 
 def _lif_nir_graph(from_file=True):
     if from_file:
-        return nir.read('tests/lif_norse.nir')
+        return nir.read("tests/lif_norse.nir")
     else:
         return nir.NIRGraph(
             nodes={
-                '0': nir.Affine(weight=np.array([[1.]]), bias=np.array([0.])),
-                '1': nir.LIF(
+                "input": nir.Input(input_type={"input": np.array([1])}),
+                "0": nir.Affine(weight=np.array([[1.0]]), bias=np.array([0.0])),
+                "1": nir.LIF(
                     tau=np.array([0.1]),
-                    r=np.array([1.]),
-                    v_leak=np.array([0.]),
-                    v_threshold=np.array([0.1])
+                    r=np.array([1.0]),
+                    v_leak=np.array([0.0]),
+                    v_threshold=np.array([0.1]),
                 ),
-                'input': nir.Input(input_type={'input': np.array([1])}),
-                'output': nir.Output(output_type={'output': np.array([1])})
+                "output": nir.Output(output_type={"output": np.array([1])}),
             },
-            edges=[
-                ('input', '0'), ('0', '1'), ('1', 'output')
-            ]
+            edges=[("input", "0"), ("0", "1"), ("1", "output")],
         )
 
 

@@ -56,7 +56,10 @@ def test_extract_empty():
 
 
 def test_extract_illegal_name():
-    graph = nir.NIRGraph({"a.b": nir.Linear(np.ones((1, 1)))}, [])
+    graph = nir.NIRGraph(
+        {"i": nir.Input(np.ones((1, 1))), "a.b": nir.Linear(np.ones((1, 1)))},
+        [("i", "a.b")],
+    )
     torch_graph = load(graph, _torch_model_map)
     assert "a_b" in torch_graph._modules
 
@@ -68,14 +71,16 @@ def test_extract_lin():
     torchlin.weight.data = torch.nn.Parameter(lin.weight)
     torchlin.bias.data = torch.nn.Parameter(lin.bias)
     y = torchlin(torchlin(x))
-    g = nir.NIRGraph({"a": lin, "b": lin}, [("a", "b")])
+    g = nir.NIRGraph(
+        {"i": nir.Input(np.ones((1, 1))), "a": lin, "b": lin}, [("i", "a"), ("a", "b")]
+    )
     m = load(g, _torch_model_map)
-    assert isinstance(m.execution_order[0].elem, torch.nn.Linear)
-    assert torch.allclose(m.execution_order[0].elem.weight, lin.weight)
-    assert torch.allclose(m.execution_order[0].elem.bias, lin.bias)
     assert isinstance(m.execution_order[1].elem, torch.nn.Linear)
     assert torch.allclose(m.execution_order[1].elem.weight, lin.weight)
     assert torch.allclose(m.execution_order[1].elem.bias, lin.bias)
+    assert isinstance(m.execution_order[2].elem, torch.nn.Linear)
+    assert torch.allclose(m.execution_order[2].elem.weight, lin.weight)
+    assert torch.allclose(m.execution_order[2].elem.bias, lin.bias)
     assert torch.allclose(m(x)[0], y)
 
 
@@ -104,11 +109,19 @@ def test_execute_stateful():
                 state = 1
             return x + state, state
 
+    def _map_stateful(node):
+        if isinstance(node, nir.Flatten):
+            return StatefulModel()
+
     g = nir.NIRGraph(
-        nodes={"li": nir.Flatten(np.array([1])), "li2": nir.Flatten(np.array([1]))},
-        edges=[("li", "li2")],
+        nodes={
+            "i": nir.Input(np.array([1, 1])),
+            "li": nir.Flatten(np.array([1])),
+            "li2": nir.Flatten(np.array([1])),
+        },
+        edges=[("i", "li"), ("li", "li2")],
     )  # Mock node
-    m = load(g, lambda m: StatefulModel())
+    m = load(g, _map_stateful)
     out, state = m(torch.ones(10))
     assert torch.allclose(out, torch.ones(10) * 3)
     assert state.state["li"] == (1,)

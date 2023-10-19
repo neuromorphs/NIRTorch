@@ -7,44 +7,8 @@ import torch
 import torch.nn as nn
 
 from .graph import Graph, Node
+from .graph_utils import trace_execution
 from .utils import sanitize_name
-
-
-def execution_order_up_to_node(
-    node: Node,
-    graph: Graph,
-    execution_order: List[Node],
-    visited: Optional[Dict[Node, bool]] = None,
-) -> List[Node]:
-    """Recursive function to evaluate execution order until a given node.
-
-    Args:
-        node (Node): Execution order for the node of interest
-        graph (Graph): Graph object describing the network
-        execution_order (List[Node]): The current known execution order.
-
-    Returns:
-        List[Node]: Execution order
-    """
-    if visited is None:
-        visited = {n: False for n in graph.node_list}
-    is_recursive = False
-    if len(execution_order) == list(graph.node_list):
-        # All nodes are executed
-        return execution_order
-    for parent in graph.find_source_nodes_of(node):
-        if parent not in execution_order and not visited[parent]:
-            visited[parent] = True
-            execution_order = execution_order_up_to_node(
-                parent, graph, execution_order, visited
-            )
-        if node in parent.outgoing_nodes:
-            is_recursive = True
-    # Ensure we're not re-adding a recursive node
-    if is_recursive and node in execution_order:
-        return execution_order
-    else:  # Finally since all parents are known and executed
-        return execution_order + [node]
 
 
 @dataclasses.dataclass
@@ -71,21 +35,25 @@ class GraphExecutor(nn.Module):
         signature = inspect.signature(module.forward)
         arguments = len(signature.parameters)
         # HACK for snntorch modules
-        if 'snntorch' in str(module.__class__):
-            if module.__class__.__name__ in ['Synaptic', 'RSynaptic', 'Leaky', 'RLeaky']:
+        if "snntorch" in str(module.__class__):
+            if module.__class__.__name__ in [
+                "Synaptic",
+                "RSynaptic",
+                "Leaky",
+                "RLeaky",
+            ]:
                 return not module.init_hidden
         return arguments > 1
 
     def get_execution_order(self) -> List[Node]:
         """Evaluate the execution order and instantiate that as a list."""
-        execution_order = []
-        # Then loop over all nodes and check that they are added to the execution order.
-        for node in self.graph.node_list:
-            if node not in execution_order:
-                execution_order = execution_order_up_to_node(
-                    node, self.graph, execution_order
-                )
-        return execution_order
+        # TODO: Adapt this for graphs with multiple inputs
+        inputs = self.graph.inputs
+        if len(inputs) != 1:
+            raise ValueError(
+                f"Currently, only one input is supported, but {len(inputs)} was given"
+            )
+        return trace_execution(inputs[0], lambda n: n.outgoing_nodes.keys())
 
     def instantiate_modules(self):
         for mod, name in self.graph.module_names.items():
@@ -136,9 +104,11 @@ class GraphExecutor(nn.Module):
         out = node.elem(*inputs)
         # If the module is stateful, we know the output is (at least) a tuple
         # HACK to make it work for snnTorch
-        is_rsynaptic = 'snntorch._neurons.rsynaptic.RSynaptic' in str(node.elem.__class__)
+        is_rsynaptic = "snntorch._neurons.rsynaptic.RSynaptic" in str(
+            node.elem.__class__
+        )
         if is_rsynaptic and not node.elem.init_hidden:
-            assert 'lif' in node.name, "this shouldnt happen.."
+            assert "lif" in node.name, "this shouldnt happen.."
             new_state.state[node.name] = out  # snnTorch requires output inside state
             out = out[0]
         elif self.stateful_modules[node.name]:
@@ -159,7 +129,11 @@ class GraphExecutor(nn.Module):
             if node.elem is None:
                 continue
             out, new_state = self._apply_module(
-                node, input_nodes, new_state, old_state, data if first_node else None
+                node,
+                input_nodes,
+                new_state=new_state,
+                old_state=old_state,
+                data=data if first_node else None,
             )
             new_state.cache[node.name] = out
             first_node = False
@@ -170,18 +144,37 @@ class GraphExecutor(nn.Module):
         return new_state.cache[node.name], new_state
 
 
-def _mod_nir_to_graph(nir_graph: nir.NIRNode) -> Graph:
-    module_names = {module: name for name, module in nir_graph.nodes.items()}
-    graph = Graph(module_names=module_names)
-    for src, dst in nir_graph.edges:
-        graph.add_edge(nir_graph.nodes[src], nir_graph.nodes[dst])
+def _mod_nir_to_graph(
+    torch_graph: nir.NIRGraph, nir_nodes: Dict[str, nir.NIRNode]
+) -> Graph:
+    module_names = {module: name for name, module in torch_graph.nodes.items()}
+    inputs = [name for name, node in nir_nodes.items() if isinstance(node, nir.Input)]
+    graph = Graph(module_names=module_names, inputs=inputs)
+    for src, dst in torch_graph.edges:
+        # Allow edges to refer to subgraph inputs and outputs
+        if not src in torch_graph.nodes and f"{src}.output" in torch_graph.nodes:
+            src = f"{src}.output"
+        if not dst in torch_graph.nodes and f"{dst}.input" in torch_graph.nodes:
+            dst = f"{dst}.input"
+        graph.add_edge(torch_graph.nodes[src], torch_graph.nodes[dst])
     return graph
+
+
+def _switch_default_models(nir_graph: nir.NIRNode) -> Optional[torch.nn.Module]:
+    if isinstance(nir_graph, nir.Input) or isinstance(nir_graph, nir.Output):
+        return torch.nn.Identity()
 
 
 def _switch_models_with_map(
     nir_graph: nir.NIRNode, model_map: Callable[[nn.Module], nn.Module]
 ) -> nir.NIRNode:
-    nodes = {name: model_map(node) for name, node in nir_graph.nodes.items()}
+    nodes = {}
+    for name, node in nir_graph.nodes.items():
+        mapped_module = model_map(node)
+        if mapped_module is None:
+            mapped_module = _switch_default_models(node)
+        nodes[name] = mapped_module
+    # nodes = {name: model_map(node) for name, node in nir_graph.nodes.items()}
     return nir.NIRGraph(nodes, nir_graph.edges)
 
 
@@ -204,6 +197,6 @@ def load(
     # Map modules to the target modules using th emodel map
     nir_module_graph = _switch_models_with_map(nir_graph, model_map)
     # Build a nirtorch.Graph based on the nir_graph
-    graph = _mod_nir_to_graph(nir_module_graph)
+    graph = _mod_nir_to_graph(nir_module_graph, nir_nodes=nir_graph.nodes)
     # Build and return a graph executor module
     return GraphExecutor(graph)

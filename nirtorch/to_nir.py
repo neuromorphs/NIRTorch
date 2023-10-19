@@ -1,4 +1,5 @@
 from typing import Any, Callable, Optional
+import logging
 
 import nir
 import numpy as np
@@ -45,13 +46,6 @@ def extract_nir_graph(
 
     if ignore_submodules_of is not None:
         torch_graph = torch_graph.ignore_submodules_of(ignore_submodules_of)
-
-    # Get the root node
-    root_nodes = torch_graph.get_root()
-    if len(root_nodes) != 1:
-        raise ValueError(
-            f"Currently, only one input is supported, but {len(root_nodes)} was given"
-        )
 
     # Convert the nodes and get indices
     nir_edges = []
@@ -141,7 +135,7 @@ def extract_nir_graph(
     # HACK: remove self-connections (this is a bug in the extraction of an RNN graph)
     for edge in nir_edges:
         if edge[0] == edge[1]:
-            print(f"[WARNING] removing self-connection {edge}")
+            logging.warn(f"removing self-connection {edge}")
             nir_edges.remove(edge)
 
     return nir.NIRGraph(nir_nodes, nir_edges)
