@@ -70,6 +70,10 @@ class GraphExecutor(nn.Module):
     def _is_module_stateful(self, module: torch.nn.Module) -> bool:
         signature = inspect.signature(module.forward)
         arguments = len(signature.parameters)
+        # HACK for snntorch modules
+        if 'snntorch' in str(module.__class__):
+            if module.__class__.__name__ in ['Synaptic', 'RSynaptic', 'Leaky', 'RLeaky']:
+                return not module.init_hidden
         return arguments > 1
 
     def get_execution_order(self) -> List[Node]:
@@ -131,7 +135,13 @@ class GraphExecutor(nn.Module):
 
         out = node.elem(*inputs)
         # If the module is stateful, we know the output is (at least) a tuple
-        if self.stateful_modules[node.name]:
+        # HACK to make it work for snnTorch
+        is_rsynaptic = 'snntorch._neurons.rsynaptic.RSynaptic' in str(node.elem.__class__)
+        if is_rsynaptic and not node.elem.init_hidden:
+            assert 'lif' in node.name, "this shouldnt happen.."
+            new_state.state[node.name] = out  # snnTorch requires output inside state
+            out = out[0]
+        elif self.stateful_modules[node.name]:
             new_state.state[node.name] = out[1:]  # Store the new state
             out = out[0]
         return out, new_state
