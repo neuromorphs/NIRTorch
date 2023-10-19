@@ -53,21 +53,38 @@ def extract_nir_graph(
 
     # Convert the nodes and get indices
     nir_edges = []
-    nir_nodes = {"input": nir.Input(np.array(sample_data.shape))}
+    input_shape = np.array(sample_data.shape)
+    # HACK: ignore dimensions
+    input_shape = np.array([e for idx, e in enumerate(sample_data.shape) if idx not in ignore_dims])
+    nir_nodes = {"input": nir.Input(input_shape)}
 
+    subgraph_keys = []
+    subgraph_input_nodekeys = []
+    subgraph_output_nodekeys = []
     # Get all the NIR nodes
     for indx, node in enumerate(torch_graph.node_list):
         # Convert the node type to NIR subgraph
         mapped_node = model_map(node.elem)
 
         if isinstance(mapped_node, nir.NIRGraph):
+            subgraph_keys.append(node.name)
             for k, v in mapped_node.nodes.items():
                 # For now, we add nodes in subgraphs to the top-level node list
-                # TODO: Parse graphs recursively
+                # TODO: support deeper nesting -> parse graphs recursively
+                assert not isinstance(v, nir.NIRGraph), "cannot handle sub-sub-graphs"
+
+                subgraph_node_key = f"{node.name}.{k}"
+
+                # keep track of subgraph input and outputs (to remove later)
+                if isinstance(v, nir.Input):
+                    subgraph_input_nodekeys.append(subgraph_node_key)
+                elif isinstance(v, nir.Output):
+                    subgraph_output_nodekeys.append(subgraph_node_key)
+
                 if isinstance(v, nir.NIRNode):
-                    nir_nodes[f"{node.name}.{k}"] = v
+                    nir_nodes[subgraph_node_key] = v
                 else:
-                    nir_nodes[v.name] = v
+                    nir_nodes[v.name] = v  # would this ever happen??
             # Add edges from graph
             for x, y in mapped_node.edges:
                 nir_edges.append((f"{node.name}.{x}", f"{node.name}.{y}"))
@@ -95,5 +112,28 @@ def extract_nir_graph(
 
     # Remove duplicate edges
     nir_edges = list(set(nir_edges))
+
+    # change edges to subgraph to point to either input or output of subgraph
+    for idx in range(len(nir_edges)):
+        if nir_edges[idx][0] in subgraph_keys:
+            nir_edges[idx] = (f"{nir_edges[idx][0]}.output", nir_edges[idx][1])
+        if nir_edges[idx][1] in subgraph_keys:
+            nir_edges[idx] = (nir_edges[idx][0], f"{nir_edges[idx][1]}.input")
+
+    # remove subgraph input and output nodes (& redirect edges)
+    for rm_nodekey in subgraph_input_nodekeys + subgraph_output_nodekeys:
+        in_keys = [e[0] for e in nir_edges if e[1] == rm_nodekey]
+        out_keys = [e[1] for e in nir_edges if e[0] == rm_nodekey]
+        # connect all incoming to all outgoing nodes
+        for in_key in in_keys:
+            for out_key in out_keys:
+                nir_edges.append((in_key, out_key))
+        # remove the original edges
+        for in_key in in_keys:
+            nir_edges.remove((in_key, rm_nodekey))
+        for out_key in out_keys:
+            nir_edges.remove((rm_nodekey, out_key))
+        # remove the node
+        nir_nodes.pop(rm_nodekey)
 
     return nir.NIRGraph(nir_nodes, nir_edges)
