@@ -13,6 +13,8 @@ def extract_nir_graph(
     sample_data: Any,
     model_name: Optional[str] = "model",
     ignore_submodules_of=None,
+    model_fwd_args=[],
+    ignore_dims=[],
 ) -> nir.NIRNode:
     """Given a `model`, generate an NIR representation using the specified `model_map`.
 
@@ -38,7 +40,7 @@ def extract_nir_graph(
 
     # Extract a torch graph given the model
     torch_graph = extract_torch_graph(
-        model, sample_data=sample_data, model_name=model_name
+        model, sample_data=sample_data, model_name=model_name, model_args=model_fwd_args
     ).ignore_tensors()
 
     if ignore_submodules_of is not None:
