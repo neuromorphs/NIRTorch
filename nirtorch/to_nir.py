@@ -1,4 +1,4 @@
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Sequence
 import logging
 
 import nir
@@ -15,7 +15,7 @@ def extract_nir_graph(
     model_name: Optional[str] = "model",
     ignore_submodules_of=None,
     model_fwd_args=[],
-    ignore_dims=[],
+    ignore_dims: Optional[Sequence[int]]=None,
 ) -> nir.NIRNode:
     """Given a `model`, generate an NIR representation using the specified `model_map`.
 
