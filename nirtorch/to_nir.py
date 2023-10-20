@@ -1,4 +1,4 @@
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Sequence
 
 import nir
 import numpy as np
@@ -13,6 +13,7 @@ def extract_nir_graph(
     sample_data: Any,
     model_name: Optional[str] = "model",
     ignore_submodules_of=None,
+    ignore_dims: Sequence[int] = [],
 ) -> nir.NIRNode:
     """Given a `model`, generate an NIR representation using the specified `model_map`.
 
@@ -49,9 +50,10 @@ def extract_nir_graph(
 
     # Convert the nodes and get indices
     nir_edges = []
-    nir_nodes = {
-        "input": nir.Input(np.array(sample_data.shape[1:]))
-    }  # Remove the first dimension
+    input_shape = np.array(sample_data.shape)
+    input_shape = np.delete(input_shape, ignore_dims)
+    nir_nodes = {"input": nir.Input(input_shape)}
+    nir_edges = []
 
     # Get all the NIR nodes
     for indx, node in enumerate(torch_graph.node_list):
