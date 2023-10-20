@@ -12,8 +12,8 @@ def extract_nir_graph(
     model_map: Callable[[nn.Module], nir.NIRNode],
     sample_data: Any,
     model_name: Optional[str] = "model",
-    ignore_submodules_of=None,
-    ignore_dims: Sequence[int] = [],
+    ignore_submodules_of: Optional[Sequence[nn.Module]] = None,
+    ignore_dims: Optional[Sequence[int]] = None,
 ) -> nir.NIRNode:
     """Given a `model`, generate an NIR representation using the specified `model_map`.
 
@@ -24,7 +24,11 @@ def extract_nir_graph(
         sample_data (Any): Sample input data to be used for model extraction
         model_name (Optional[str], optional): The name of the top level module.
             Defaults to "model".
-
+        ignore_submodules_of (Optional[Sequence[nn.Module]]): If specified,
+            the corresponding module's children will not be traversed for graph.
+        ignore_dims (Optional[Sequence[int]]): Dimensions of data to be ignored for
+            type/shape inference. Typically the dimensions that you will want to ignore
+            are for batch and time.
     Returns:
         nir.NIR: Returns the generated NIR graph representation.
     """
@@ -51,8 +55,10 @@ def extract_nir_graph(
     # Convert the nodes and get indices
     nir_edges = []
     input_shape = np.array(sample_data.shape)
-    input_shape = np.delete(input_shape, ignore_dims)
-    nir_nodes = {"input": nir.Input(input_shape)}
+    if ignore_dims:
+        nir_nodes = {"input": nir.Input(np.delete(input_shape, ignore_dims))}
+    else:
+        nir_nodes = {"input": nir.Input(input_shape)}
     nir_edges = []
 
     # Get all the NIR nodes
@@ -89,9 +95,13 @@ def extract_nir_graph(
         if len(node.outgoing_nodes) == 0:
             out_name = "output"
             # Try to find shape of input to the Output node
-            output_node = nir.Output(
-                torch_graph.module_output_types[node.elem][1:]
-            )  # Ignore batch dimension
+            if ignore_dims:
+                out_shape = np.delete(
+                    torch_graph.module_output_types[node.elem], ignore_dims
+                )
+            else:
+                out_shape = torch_graph.module_output_types[node.elem]
+            output_node = nir.Output(out_shape)
             nir_nodes[out_name] = output_node
             nir_edges.append((node.name, out_name))
 

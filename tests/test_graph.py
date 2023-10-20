@@ -278,9 +278,11 @@ def test_output_type_when_single_node():
 
 def test_sequential_flatten():
     d = torch.empty(2, 3, 4)
-    g = extract_nir_graph(torch.nn.Flatten(1), lambda x: nir.Flatten(d.shape, 1), d)
+    g = extract_nir_graph(
+        torch.nn.Flatten(1), lambda x: nir.Flatten(d.shape, 1), d, ignore_dims=[0]
+    )
     assert tuple(g.nodes["input"].input_type["input"]) == (3, 4)
-    assert tuple(g.nodes["output"].output_type["output"]) == (3 * 4, )
+    assert tuple(g.nodes["output"].output_type["output"]) == (3 * 4,)
 
 
 @pytest.mark.skip(reason="Not supported yet")
