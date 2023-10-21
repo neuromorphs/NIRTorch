@@ -130,8 +130,8 @@ def test_execute_stateful():
     assert state.state["li"] == (1,)
     assert state.state["li"] == (1,)
 
-    # Test that the model can return zero state
-    m.return_state = False
+    # Test that the model can avoid returning state
+    m = load(g, _map_stateful, return_state=False)
     assert not isinstance(m(torch.ones(10)), tuple)
 
 def test_execute_recurrent():
