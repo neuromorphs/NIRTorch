@@ -3,4 +3,4 @@ torch
 nir
 ruff
 git+https://github.com/norse/norse
-git+https://github.com/synsense/sinabs@dev/nix
+git+https://github.com/synsense/sinabs@dev/nir
