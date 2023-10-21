@@ -22,10 +22,25 @@ class GraphExecutorState:
 
 
 class GraphExecutor(nn.Module):
-    def __init__(self, graph: Graph) -> None:
+    """Executes the NIR graph in PyTorch.
+
+    By default the graph executor is stateful, since there may be recurrence or stateful modules in the graph.
+    Specifically, that means accepting and returning a state object (`GraphExecutorState`).
+    If that is not desired, set `return_state=False` in the constructor.
+
+    Arguments:
+        graph (Graph): The graph to execute
+        return_state (bool, optional): Whether to return the state object. Defaults to True.
+
+    Raises:
+        ValueError: If there are no edges in the graph
+    """
+
+    def __init__(self, graph: Graph, return_state: bool = True) -> None:
         super().__init__()
         self.graph = graph
-        self.stateful_modules = {}
+        self.stateful_modules = set()
+        self.return_state = return_state
         self.instantiate_modules()
         self.execution_order = self.get_execution_order()
         if len(self.execution_order) == 0:
@@ -43,7 +58,7 @@ class GraphExecutor(nn.Module):
                 "RLeaky",
             ]:
                 return not module.init_hidden
-        return arguments > 1
+        return "state" in signature.parameters and arguments > 1
 
     def get_execution_order(self) -> List[Node]:
         """Evaluate the execution order and instantiate that as a list."""
@@ -59,9 +74,8 @@ class GraphExecutor(nn.Module):
         for mod, name in self.graph.module_names.items():
             if mod is not None:
                 self.add_module(sanitize_name(name), mod)
-                self.stateful_modules[sanitize_name(name)] = self._is_module_stateful(
-                    mod
-                )
+                if self._is_module_stateful(mod):
+                    self.stateful_modules.add(sanitize_name(name))
 
     def get_input_nodes(self) -> List[Node]:
         # NOTE: This is a hack. Should use the input nodes from NIR graph
@@ -111,7 +125,7 @@ class GraphExecutor(nn.Module):
             assert "lif" in node.name, "this shouldnt happen.."
             new_state.state[node.name] = out  # snnTorch requires output inside state
             out = out[0]
-        elif self.stateful_modules[node.name]:
+        elif node.name in self.stateful_modules:
             new_state.state[node.name] = out[1:]  # Store the new state
             out = out[0]
         return out, new_state
@@ -141,7 +155,10 @@ class GraphExecutor(nn.Module):
         # If the output node is a dummy nir.Output node, use the second-to-last node
         if node.name not in new_state.cache:
             node = self.execution_order[-2]
-        return new_state.cache[node.name], new_state
+        if self.return_state:
+            return new_state.cache[node.name], new_state
+        else:
+            return new_state.cache[node.name]
 
 
 def _mod_nir_to_graph(

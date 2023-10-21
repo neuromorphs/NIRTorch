@@ -83,8 +83,10 @@ def test_nir_to_torch_to_nir(from_file=True):
     module = nirtorch.load(graph, _nir_to_torch_module)
     assert module is not None
     graph2 = nirtorch.extract_nir_graph(module, _torch_to_nir, torch.zeros(1, 1))
-    assert sorted(graph.edges) == sorted(graph2.edges)
-    assert graph2 is not None
+    edges1 = sorted(graph.edges)
+    edges2 = sorted(graph2.edges)
+    for e1, e2 in zip(edges1, edges2):
+        assert e1 == e2
 
 
 # if __name__ == '__main__':

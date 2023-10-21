@@ -123,11 +123,16 @@ def test_execute_stateful():
         edges=[("i", "li"), ("li", "li2")],
     )  # Mock node
     m = load(g, _map_stateful)
-    out, state = m(torch.ones(10))
+    out = m(torch.ones(10))
+    assert isinstance(out, tuple)
+    out, state = out
     assert torch.allclose(out, torch.ones(10) * 3)
     assert state.state["li"] == (1,)
     assert state.state["li"] == (1,)
 
+    # Test that the model can return zero state
+    m.return_state = False
+    assert not isinstance(m(torch.ones(10)), tuple)
 
 def test_execute_recurrent():
     w = np.ones((1, 1))
