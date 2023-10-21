@@ -196,15 +196,31 @@ def _switch_models_with_map(
 
 
 def load(
-    nir_graph: Union[nir.NIRNode, str], model_map: Callable[[nir.NIRNode], nn.Module]
+    nir_graph: Union[nir.NIRNode, str],
+    model_map: Callable[[nir.NIRNode], nn.Module],
+    return_state: bool = True,
 ) -> nn.Module:
     """Load a NIR graph and convert it to a torch module using the given model map.
+
+    Because the graph can contain recurrence and stateful modules, the execution accepts
+    a secondary state argument and returns a tuple of [output, state], instead of just the output as follows
+
+    >>> executor = nirtorch.load(nir_graph, model_map)
+    >>> old_state = None
+    >>> output, state = executor(input, old_state) # Notice the second argument and output
+    >>> output, state = executor(input, state) # This can go on for many (time)steps
+
+    If you do not wish to operate with state, set `return_state=False`.
 
     Args:
         nir_graph (Union[nir.NIRNode, str]): The NIR object to load, or a string representing
             the path to the NIR object.
         model_map (Callable[[nn.NIRNode], nn.Module]): A method that returns the a torch
             module that corresponds to each NIR node.
+        return_state (bool): If True, the execution of the loaded graph will return a tuple
+            of [output, state], where state is a GraphExecutorState object. If False, only
+            the NIR graph output will be returned. Note that state is required for recurrence
+            to work in the graphs.
 
     Returns:
         nn.Module: The generated torch module
@@ -216,4 +232,4 @@ def load(
     # Build a nirtorch.Graph based on the nir_graph
     graph = _mod_nir_to_graph(nir_module_graph, nir_nodes=nir_graph.nodes)
     # Build and return a graph executor module
-    return GraphExecutor(graph)
+    return GraphExecutor(graph, return_state=return_state)
