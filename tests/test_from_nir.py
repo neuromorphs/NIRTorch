@@ -29,9 +29,9 @@ def test_extract_empty():
 
 
 def test_extract_illegal_name():
-    graph = nir.NIRGraph({"a.b": nir.Input(np.ones(1))}, [])
+    graph = nir.NIRGraph({"a.b": nir.Input(np.ones(1)), "a.c": nir.Linear(np.array([[1.]]))}, [("a.b", "a.c")])
     torch_graph = load(graph, _torch_model_map)
-    assert "a_b" in torch_graph._modules
+    assert "a_c" in torch_graph._modules
 
 
 def test_extract_lin():
