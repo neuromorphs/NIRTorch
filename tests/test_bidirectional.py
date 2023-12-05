@@ -1,8 +1,8 @@
 import nir
 import numpy as np
 import torch
-import nirtorch
 
+import nirtorch
 
 use_snntorch = False
 # use_snntorch = True

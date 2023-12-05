@@ -1,10 +1,10 @@
+import nir
 import pytest
 import torch
 import torch.nn as nn
 from norse.torch import LIBoxCell, LIFCell, SequentialState
 from sinabs.layers import Merge
 
-import nir
 from nirtorch import extract_nir_graph, extract_torch_graph
 
 
@@ -238,6 +238,7 @@ def test_root_has_no_source():
         len(graph.find_source_nodes_of(graph.find_node(my_branched_model.relu1))) == 0
     )
 
+
 @pytest.mark.skip(reason="Root tracing is broken")
 def test_get_root():
     graph = extract_torch_graph(my_branched_model, sample_data=data, model_name=None)
@@ -282,7 +283,9 @@ def test_sequential_flatten():
     assert tuple(g.nodes["input"].input_type["input"]) == (3, 4)
 
     d = torch.empty(2, 3, 4)
-    g = extract_nir_graph(torch.nn.Flatten(1), lambda x: nir.Flatten(d.shape, 1), d, ignore_dims=[0])
+    g = extract_nir_graph(
+        torch.nn.Flatten(1), lambda x: nir.Flatten(d.shape, 1), d, ignore_dims=[0]
+    )
     assert tuple(g.nodes["input"].input_type["input"]) == (3, 4)
 
 
@@ -310,6 +313,7 @@ def test_captures_recurrence_automatically():
     d = extract_nir_graph(m, _extract_norse_module, data)
     assert d.nodes.keys() == {"input", "l", "r", "output"}
     assert set(d.edges) == {("input", "r"), ("r", "l"), ("l", "output"), ("r", "r")}
+
 
 @pytest.mark.skip(reason="Subgraphs are currently flattened")
 def test_captures_recurrence_manually():

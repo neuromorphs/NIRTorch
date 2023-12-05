@@ -115,7 +115,9 @@ def test_ignore_batch_dim():
         return nir.Affine(module.weight, module.bias)
 
     raw_input_shape = (1, 3)
-    g = extract_nir_graph(model, extractor, torch.ones(raw_input_shape), ignore_dims=[0])
+    g = extract_nir_graph(
+        model, extractor, torch.ones(raw_input_shape), ignore_dims=[0]
+    )
     exp_input_shape = (3,)
     assert np.alltrue(g.nodes["input"].input_type["input"] == np.array(exp_input_shape))
     assert g.nodes["model"].weight.shape == (1, 3)
@@ -129,13 +131,17 @@ def test_ignore_time_and_batch_dim():
         return nir.Affine(module.weight, module.bias)
 
     raw_input_shape = (1, 10, 3)
-    g = extract_nir_graph(model, extractor, torch.ones(raw_input_shape), ignore_dims=[0, -2])
+    g = extract_nir_graph(
+        model, extractor, torch.ones(raw_input_shape), ignore_dims=[0, -2]
+    )
     exp_input_shape = (3,)
     assert np.alltrue(g.nodes["input"].input_type["input"] == np.array(exp_input_shape))
     assert g.nodes["model"].weight.shape == (1, 3)
 
     raw_input_shape = (1, 10, 3)
-    g = extract_nir_graph(model, extractor, torch.ones(raw_input_shape), ignore_dims=[0, 1])
+    g = extract_nir_graph(
+        model, extractor, torch.ones(raw_input_shape), ignore_dims=[0, 1]
+    )
     exp_input_shape = (3,)
     assert np.alltrue(g.nodes["input"].input_type["input"] == np.array(exp_input_shape))
 

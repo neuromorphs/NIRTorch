@@ -65,12 +65,12 @@ def find_all_ancestors(
 #     return execution_order
 #
 
+
 def trace_execution(
     node: T, edge_fn: Callable[[T], List[T]], visited: Set[T] = None
 ) -> List[T]:
-    """Traces the execution of a node by listing them in order, coloring recursive
-    nodes to avoid adding the same node twice.
-    """
+    """Traces the execution of a node by listing them in order, coloring recursive nodes
+    to avoid adding the same node twice."""
     if visited is None:
         visited = set()
 

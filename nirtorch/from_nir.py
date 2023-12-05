@@ -1,6 +1,6 @@
 import dataclasses
 import inspect
-from typing import Callable, Dict, List, Optional, Any, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import nir
 import torch
@@ -13,8 +13,8 @@ from .utils import sanitize_name
 
 @dataclasses.dataclass
 class GraphExecutorState:
-    """State for the GraphExecutor that keeps track of both the state of hidden
-    units and caches the output of previous modules, for use in (future) recurrent
+    """State for the GraphExecutor that keeps track of both the state of hidden units
+    and caches the output of previous modules, for use in (future) recurrent
     computations."""
 
     state: Dict[str, Any] = dataclasses.field(default_factory=dict)
@@ -24,14 +24,14 @@ class GraphExecutorState:
 class GraphExecutor(nn.Module):
     """Executes the NIR graph in PyTorch.
 
-    By default the graph executor is stateful, since there may be recurrence or 
-    stateful modules in the graph. Specifically, that means accepting and returning a 
-    state object (`GraphExecutorState`). If that is not desired, 
+    By default the graph executor is stateful, since there may be recurrence or
+    stateful modules in the graph. Specifically, that means accepting and returning a
+    state object (`GraphExecutorState`). If that is not desired,
     set `return_state=False` in the constructor.
 
     Arguments:
         graph (Graph): The graph to execute
-        return_state (bool, optional): Whether to return the state object. 
+        return_state (bool, optional): Whether to return the state object.
             Defaults to True.
 
     Raises:
@@ -92,6 +92,7 @@ class GraphExecutor(nn.Module):
         data: Optional[torch.Tensor] = None,
     ):
         """Applies a module and keeps track of its state.
+
         TODO: Use pytree to recursively construct the state
         """
         inputs = []
@@ -205,7 +206,7 @@ def load(
     """Load a NIR graph and convert it to a torch module using the given model map.
 
     Because the graph can contain recurrence and stateful modules, the execution accepts
-    a secondary state argument and returns a tuple of [output, state], instead of just 
+    a secondary state argument and returns a tuple of [output, state], instead of just
     the output as follows
 
     >>> executor = nirtorch.load(nir_graph, model_map)
@@ -216,13 +217,13 @@ def load(
     If you do not wish to operate with state, set `return_state=False`.
 
     Args:
-        nir_graph (Union[nir.NIRNode, str]): The NIR object to load, or a string 
+        nir_graph (Union[nir.NIRNode, str]): The NIR object to load, or a string
             representing the path to the NIR object.
         model_map (Callable[[nn.NIRNode], nn.Module]): A method that returns the a torch
             module that corresponds to each NIR node.
-        return_state (bool): If True, the execution of the loaded graph will return a 
-            tuple of [output, state], where state is a GraphExecutorState object. 
-            If False, only the NIR graph output will be returned. Note that state is 
+        return_state (bool): If True, the execution of the loaded graph will return a
+            tuple of [output, state], where state is a GraphExecutorState object.
+            If False, only the NIR graph output will be returned. Note that state is
             required for recurrence to work in the graphs.
 
     Returns:

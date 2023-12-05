@@ -1,5 +1,5 @@
-from typing import Any, Callable, Optional, Sequence
 import logging
+from typing import Any, Callable, Optional, Sequence
 
 import nir
 import numpy as np
@@ -15,13 +15,14 @@ def extract_nir_graph(
     model_name: Optional[str] = "model",
     ignore_submodules_of=None,
     model_fwd_args=[],
-    ignore_dims: Optional[Sequence[int]]=None,
+    ignore_dims: Optional[Sequence[int]] = None,
 ) -> nir.NIRNode:
     """Given a `model`, generate an NIR representation using the specified `model_map`.
 
     Assumptions and known issues:
-        - Cannot deal with layers like torch.nn.Identity(), since the input tensor and output
-            tensor will be the same object, and therefore lead to cyclic connections.
+        - Cannot deal with layers like torch.nn.Identity(), since the input tensor and
+          output tensor will be the same object, and therefore lead to cyclic
+          connections.
 
     Args:
         model (nn.Module): The model of interest

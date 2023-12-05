@@ -21,7 +21,7 @@ class StringNode:
 
     def __hash__(self) -> int:
         return self.name.__hash__()
-    
+
     def __eq__(self, other: object) -> bool:
         return self.name == other.name
 

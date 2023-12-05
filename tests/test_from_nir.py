@@ -1,7 +1,7 @@
 import nir
 import numpy as np
-import torch
 import pytest
+import torch
 
 from nirtorch.from_nir import load
 
@@ -56,7 +56,10 @@ def test_extract_empty():
 
 
 def test_extract_illegal_name():
-    graph = nir.NIRGraph({"a.b": nir.Input(np.ones(1)), "a.c": nir.Linear(np.array([[1.]]))}, [("a.b", "a.c")])
+    graph = nir.NIRGraph(
+        {"a.b": nir.Input(np.ones(1)), "a.c": nir.Linear(np.array([[1.0]]))},
+        [("a.b", "a.c")],
+    )
     torch_graph = load(graph, _torch_model_map)
     assert "a_c" in torch_graph._modules
 
@@ -130,6 +133,7 @@ def test_execute_stateful():
     # Test that the model can avoid returning state
     m = load(g, _map_stateful, return_state=False)
     assert not isinstance(m(torch.ones(10)), tuple)
+
 
 def test_execute_recurrent():
     w = np.ones((1, 1))
