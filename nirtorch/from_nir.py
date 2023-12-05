@@ -49,10 +49,10 @@ class GraphExecutor(nn.Module):
     def __init__(self, graph: Graph) -> None:
         super().__init__()
         self.graph = graph
-        self.instantiate_modules()
         self.execution_order = self.get_execution_order()
         if len(self.execution_order) == 0:
             raise ValueError("Graph is empty")
+        self.instantiate_modules()
 
     def get_execution_order(self) -> List[Node]:
         """Evaluate the execution order and instantiate that as a list."""
@@ -66,9 +66,9 @@ class GraphExecutor(nn.Module):
         return execution_order
 
     def instantiate_modules(self):
-        for mod, name in self.graph.module_names.items():
-            if isinstance(mod, nn.Module):
-                self.add_module(sanitize_name(name), mod)
+        # Instantiate all modules in the order of execution
+        for node in self.execution_order:
+            self.add_module(sanitize_name(node.name), node.elem)
 
     def get_input_nodes(self) -> List[Node]:
         # NOTE: This is a hack. Should use the input nodes from NIR graph
