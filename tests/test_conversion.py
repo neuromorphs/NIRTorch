@@ -1,20 +1,18 @@
+import nir
 import torch
 import torch.nn as nn
 
-import nir
 import nirtorch
 
 
 def _torch_convert(module: nn.Module) -> nir.NIRNode:
     if isinstance(module, nn.Conv1d):
-        return nir.Conv1d(module.weight, 1, 1, 1, 1, module.bias)
+        return nir.Conv1d(None, module.weight, 1, 1, 1, 1, module.bias)
     elif isinstance(module, nn.Linear):
         return nir.Affine(module.weight, module.bias)
-    else:
-        raise NotImplementedError(f"Unsupported module {module}")
 
 
-def test_norse_to_sinabs():
+def test_extract_pytorch():
     model = torch.nn.Sequential(
         torch.nn.Conv1d(1, 2, 3),
         torch.nn.Linear(8, 1),
