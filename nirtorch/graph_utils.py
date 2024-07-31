@@ -1,5 +1,7 @@
 from typing import Callable, List, Set, TypeVar
 
+from torch import nn
+
 T = TypeVar("T")
 
 
@@ -84,3 +86,11 @@ def trace_execution(
         if child not in visited:
             successors += trace_execution(child, edge_fn, visited)
     return [node] + successors
+
+
+class GraphInputNode(nn.Module):
+    pass
+
+
+class GraphOutputNode(nn.Module):
+    pass
