@@ -119,9 +119,9 @@ def test_ignore_batch_dim():
         model, extractor, torch.ones(raw_input_shape), ignore_dims=[0]
     )
     exp_input_shape = (3,)
-    assert np.alltrue(g.nodes["input"].input_type["input"] == np.array(exp_input_shape))
+    assert np.all(g.nodes["input"].input_type["input"] == np.array(exp_input_shape))
     assert g.nodes["model"].weight.shape == (1, 3)
-    assert np.alltrue(g.nodes["output"].output_type["output"] == np.array([1]))
+    assert np.all(g.nodes["output"].output_type["output"] == np.array([1]))
 
 
 def test_ignore_time_and_batch_dim():
@@ -135,7 +135,7 @@ def test_ignore_time_and_batch_dim():
         model, extractor, torch.ones(raw_input_shape), ignore_dims=[0, -2]
     )
     exp_input_shape = (3,)
-    assert np.alltrue(g.nodes["input"].input_type["input"] == np.array(exp_input_shape))
+    assert np.all(g.nodes["input"].input_type["input"] == np.array(exp_input_shape))
     assert g.nodes["model"].weight.shape == (1, 3)
 
     raw_input_shape = (1, 10, 3)
@@ -143,7 +143,7 @@ def test_ignore_time_and_batch_dim():
         model, extractor, torch.ones(raw_input_shape), ignore_dims=[0, 1]
     )
     exp_input_shape = (3,)
-    assert np.alltrue(g.nodes["input"].input_type["input"] == np.array(exp_input_shape))
+    assert np.all(g.nodes["input"].input_type["input"] == np.array(exp_input_shape))
 
 
 # def test_extract_stateful():
