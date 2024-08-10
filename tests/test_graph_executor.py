@@ -1,7 +1,7 @@
 import torch
 
 from nirtorch.graph import TorchGraph
-from nirtorch.graph_executor import GraphExecutor, GraphExecutorState
+from nirtorch.graph_executor import GraphExecutor
 
 
 def test_execute_stateful_then_stateless():
@@ -15,9 +15,9 @@ def test_execute_stateful_then_stateless():
             return x + state, x
 
     s = StatefulModel()
-    l = torch.nn.Linear(1, 1, bias=False)
-    l.weight.data = torch.tensor([[1]]).float()
-    graph = TorchGraph.from_torch_modules({"0": s, "1": l}, [("0", "1")])
+    lin = torch.nn.Linear(1, 1, bias=False)
+    lin.weight.data = torch.tensor([[1]]).float()
+    graph = TorchGraph.from_torch_modules({"0": s, "1": lin}, [("0", "1")])
 
     # With state
     executor = GraphExecutor(graph, True)

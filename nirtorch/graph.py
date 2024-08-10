@@ -1,5 +1,4 @@
 import warnings
-from collections import defaultdict
 from numbers import Number
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
