@@ -18,8 +18,6 @@ def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
         return lin
     elif isinstance(m, nir.Input) or isinstance(m, nir.Output):
         return torch.nn.Identity()
-    else:
-        raise NotImplementedError(f"Unsupported module {m}")
 
 
 def _recurrent_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
@@ -36,8 +34,10 @@ def _recurrent_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module
             return self.lin(z), z
 
     try:
-        return _torch_model_map(m, device)
+        mapped_model = _torch_model_map(m, device)
     except NotImplementedError:
+        mapped_model = None
+    if mapped_model is None:
         if isinstance(m, nir.CubaLIF):
             return torch.nn.Identity()
         elif isinstance(m, nir.NIRGraph):
@@ -47,6 +47,8 @@ def _recurrent_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module
             )
         else:
             raise NotImplementedError(f"Unsupported module {m}")
+    else:
+        return mapped_model
 
 
 def test_extract_empty():
@@ -150,6 +152,19 @@ def test_execute_recurrent():
     assert torch.allclose(y1[0], y2[0])
     out, s = m(*m(data))
     assert torch.allclose(out, torch.tensor(2.0))
+
+
+def test_execute_graph_in_graph():
+    w = np.ones((1, 1)) * 2
+    g1 = nir.NIRGraph.from_list(nir.Linear(w))
+    g2 = nir.NIRGraph.from_list(g1, nir.Linear(w))
+    m = load(g2, _torch_model_map)
+    data = torch.ones(1, 1)
+    out, state = m(data)
+    assert torch.allclose(out, torch.tensor(4.0))
+    assert torch.allclose(
+        state.state["nirgraph"][0].cache["linear"], torch.tensor([2.0])
+    )
 
 
 def test_import_braille():

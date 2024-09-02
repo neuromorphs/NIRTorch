@@ -6,6 +6,7 @@ from norse.torch import LIBoxCell, LIFCell, SequentialState
 from sinabs.layers import Merge
 
 from nirtorch import extract_nir_graph, extract_torch_graph
+from nirtorch.graph import TorchGraph, named_modules_map, GraphTracer
 
 
 class TupleModule(torch.nn.Module):
@@ -106,10 +107,10 @@ def test_module_forward_wrapper():
 
     orig_call = nn.Module.__call__
 
-    from nirtorch.graph import Graph, module_forward_wrapper, named_modules_map
+    from nirtorch.graph import TorchGraph, module_forward_wrapper, named_modules_map
 
     output_types = {}
-    model_graph = Graph(named_modules_map(mymodel), ["block1"])
+    model_graph = TorchGraph(named_modules_map(mymodel), ["block1"])
     new_call = module_forward_wrapper(model_graph, output_types)
 
     # Override call to the new wrapped call
@@ -128,16 +129,30 @@ def test_module_forward_wrapper():
     assert len(output_types) == 6  # 1 top module + 5 submodules
 
 
-def test_graph_tracer():
+def test_graph_trace_one():
+    model = nn.ReLU()
+    module_map = named_modules_map(model)
+    sample_data = torch.rand((1,))
+    with GraphTracer(module_map) as tracer, torch.no_grad():
+        _ = model(sample_data)
+    assert len(tracer.graph.node_list) == 1
+    assert tracer.graph.node_list[0].elem == model
+
+
+def test_graph_trace_many():
     from nirtorch.graph import GraphTracer, named_modules_map
 
     with GraphTracer(named_modules_map(my_branched_model)) as tracer, torch.no_grad():
         _ = my_branched_model(data)
 
-    print(tracer.graph)
-    assert (
-        len(tracer.graph.node_list) == 1 + 5 + 5 + 1
-    )  # 1 top module + 5 submodules + 5 tensors + 1 output tensor
+    assert len(tracer.graph.node_list) == 5  # 5 submodules
+    assert tracer.graph.get_edges() == [
+        ("relu1", "relu2_1"),
+        ("relu1", "relu2_2"),
+        ("relu2_1", "add_mod"),
+        ("relu2_2", "add_mod"),
+        ("add_mod", "relu3"),
+    ]
 
 
 def test_leaf_only_graph():
@@ -152,7 +167,7 @@ def test_leaf_only_graph():
     leaf_graph = tracer.graph.leaf_only()
     print(leaf_graph)
     assert (
-        len(leaf_graph.node_list) == len(tracer.graph.node_list) - 3
+        len(leaf_graph.node_list) == len(tracer.graph.node_list) - 2
     )  # No more top modules
 
 
@@ -165,8 +180,7 @@ def test_ignore_submodules_of():
     top_overview_graph = tracer.graph.ignore_submodules_of(
         [SinabsBranchedModel]
     ).leaf_only()
-    print(top_overview_graph)
-    assert len(top_overview_graph.node_list) == 2 + 2 + 1
+    assert len(top_overview_graph.node_list) == 2
 
 
 def test_snn_branched():
@@ -215,20 +229,19 @@ def test_snn_branched():
         my_snn, sample_data=torch.rand((100, 2, 14, 14)), model_name=None
     )
 
-    print(graph)
-    assert len(graph.node_list) == 27  # 2*13 + 1
+    assert len(graph.node_list) == 13
 
 
 def test_snn_stateful():
     model = NorseStatefulModel()
     graph = extract_torch_graph(model, sample_data=torch.rand((1, 2, 3, 4)))
-    assert len(graph.node_list) == 6  # 2 + 1 nested + 3 tensors
+    assert len(graph.node_list) == 2
 
 
 def test_ignore_tensors():
     graph = extract_torch_graph(my_branched_model, sample_data=data)
     mod_only_graph = graph.ignore_tensors()
-    assert len(mod_only_graph.node_list) == 6
+    assert len(mod_only_graph.node_list) == 5
 
 
 def test_root_has_no_source():
@@ -274,6 +287,8 @@ def test_output_type_when_single_node():
         lambda x: nir.Threshold(torch.tensor(0.1)),
         sample_data=torch.rand((1,)),
     )
+    assert "input" in g.nodes
+    assert "output" in g.nodes
     g.nodes["output"].output_type["output"] == torch.Size([1])
 
 
@@ -334,3 +349,16 @@ def test_captures_recurrence_manually():
     # TODO: Pass recursively
     # assert d.nodes["1"].nodes.keys() == {"i"}
     # assert d.nodes["1"].edges == [("1.i", "1.i")]
+
+
+def test_graph_captures_input():
+    model = nn.Sequential(
+        nn.Conv2d(2, 8, 3),
+        nn.AvgPool2d(2),
+        nn.ReLU(),
+    )
+
+    modules = {module: name for name, module in list(model.named_modules())[1:]}
+    g = TorchGraph(modules, ["0"])
+    assert len(g.inputs) == 1
+    assert g.inputs[0] == "0"

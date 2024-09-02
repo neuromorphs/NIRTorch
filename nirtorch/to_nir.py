@@ -47,7 +47,7 @@ def extract_nir_graph(
     # Extract a torch graph given the model
     torch_graph = extract_torch_graph(
         model, sample_data=sample_data, model_name=model_name, model_args=model_fwd_args
-    ).ignore_tensors()
+    )
 
     if ignore_submodules_of is not None:
         torch_graph = torch_graph.ignore_submodules_of(ignore_submodules_of)
