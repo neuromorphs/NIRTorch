@@ -162,7 +162,7 @@ def test_import_braille():
 def test_deprecation_warning():
     g = nir.read("tests/braille.nir")
     with warnings.catch_warnings(record=True) as warn:
-        m = load(g, _recurrent_model_map)
+        load(g, _recurrent_model_map)
         assert len(warn) == 1
         assert isinstance(warn[0].message, DeprecationWarning)
 

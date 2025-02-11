@@ -15,7 +15,7 @@ class LeakyNode(torch.nn.Module):
             setattr(self, key, value)
 
     def forward(self, x, state=None):
-        if state == None:
+        if state is None:
             state = self.v_leak
         new_value = state + self.tau * (self.r * x - self.v_leak)
         return new_value, new_value

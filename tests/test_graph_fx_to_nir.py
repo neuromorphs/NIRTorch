@@ -107,7 +107,7 @@ def test_trace_sequential():
     assert graph.__class__ == nir.NIRGraph
     assert len(graph.nodes) == 4
     assert len(graph.edges) == 3
-    nodes = list(graph.nodes.items())
+    list(graph.nodes.items())
     assert len(_filter_nodes(graph, nir.Input)) == 1, "We require one input node"
     assert len(_filter_nodes(graph, nir.Output)) == 1, "We require one output node"
     assert len(_filter_nodes(graph, nir.Affine)) == 2, "We require two affine nodes"
@@ -131,7 +131,7 @@ def test_trace_submodule():
     assert graph.__class__ == nir.NIRGraph
     assert len(graph.nodes) == 3
     assert len(graph.edges) == 2
-    nodes = list(graph.nodes.items())
+    list(graph.nodes.items())
     assert len(_filter_nodes(graph, nir.Input)) == 1, "We require one input node"
     assert len(_filter_nodes(graph, nir.Output)) == 1, "We require one output node"
     assert len(_filter_nodes(graph, nir.Affine)) == 1, "We require one affine node"
