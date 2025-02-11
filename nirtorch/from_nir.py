@@ -1,3 +1,4 @@
+import warnings
 from typing import Callable, Optional, Union
 
 import nir
@@ -6,6 +7,7 @@ import torch.nn as nn
 
 from .graph import TorchGraph
 from .graph_executor import GraphExecutor
+from .interpreter import to_torch, NodeMapType
 from .utils import sanitize_name
 
 
@@ -48,18 +50,16 @@ def _map_graph_to_torch(
 
 def load(
     nir_graph: Union[nir.NIRNode, str],
-    model_map: Callable[[nir.NIRNode], nn.Module],
+    model_map: Union[Callable[[nir.NIRNode], nn.Module], NodeMapType],
     return_state: bool = True,
 ) -> nn.Module:
     """Load a NIR graph and convert it to a torch module using the given model map.
 
-    Because the graph can contain recurrence and stateful modules, the execution accepts
-    a secondary state argument and returns a tuple of [output, state], instead of just
-    the output as follows
+    Because the graph can contain recurrence and stateful modules.
 
+    >>> map = {nir.LI: lambda li: MyLIModule(li.tau, li.r, li.v_leak)}
     >>> executor = nirtorch.load(nir_graph, model_map)
-    >>> old_state = None
-    >>> output, state = executor(input, old_state) # Notice second argument and output
+    >>> output, state = executor(input) # Note the state return value
     >>> output, state = executor(input, state) # This can go on for many (time)steps
 
     If you do not wish to operate with state, set `return_state=False`.
@@ -79,5 +79,20 @@ def load(
     """
     if isinstance(nir_graph, str):
         nir_graph = nir.read(nir_graph)
-    # Convert the NIR graph to a torch graph
-    return _map_graph_to_torch(nir_graph, model_map, return_state=return_state)
+
+    # TODO: Deprecate the old model map type
+    if isinstance(model_map, Callable):
+        warnings.warn(
+            "You are using an old call to nirtorch.load. "
+            "Please refer to https://github.com/neuromorphs/NIRTorch/pull/28 for instructions",
+            DeprecationWarning,
+        )
+        # Convert the NIR graph to a torch graph
+        return _map_graph_to_torch(nir_graph, model_map, return_state=return_state)
+    else:
+        if not return_state:
+            warnings.warn(
+                "return_state is deprecated and will be removed in future releases",
+                DeprecationWarning,
+            )
+        return to_torch(nir_graph, node_map=model_map)

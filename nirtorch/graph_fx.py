@@ -1,13 +1,11 @@
-from typing import Any, Callable, Dict, Set, Tuple, TypeAlias, Optional
+from typing import Any, Callable, Dict, Set, Tuple, Optional
 import operator
 
 import numpy as np
-from torch.nn.modules import Module
 
 import nir
 import torch
-from torch.fx import Graph, GraphModule, Node, Tracer, Transformer
-from torch.fx.passes import shape_prop
+from torch.fx import GraphModule, Node, Tracer, Transformer
 
 
 class NIRTorchTracer(Tracer):

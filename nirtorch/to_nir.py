@@ -7,7 +7,6 @@ import numpy as np
 import torch.nn as nn
 
 from .graph import extract_torch_graph
-from .graph_fx import trace_torch_graph
 
 
 DEFAULT_MAPS: Dict[nn.Module, Callable[[nn.Module], nir.NIRNode]] = {
@@ -173,7 +172,9 @@ def extract_nir_graph(
 def trace_nir_graph(
     model: nn.Module,
     model_map: Dict[nn.Module, Callable[[nn.Module], nir.NIRNode]],
-    default_map: Optional[Dict[nn.Module, Callable[[nn.Module], nir.NIRNode]]] = DEFAULT_MAPS,
+    default_map: Optional[
+        Dict[nn.Module, Callable[[nn.Module], nir.NIRNode]]
+    ] = DEFAULT_MAPS,
     model_name: Optional[str] = "model",
     ignore_submodules_of=None,
     model_fwd_args=[],

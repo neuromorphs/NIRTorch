@@ -1,3 +1,5 @@
+import warnings
+
 import nir
 import numpy as np
 import pytest
@@ -86,22 +88,6 @@ def test_extract_lin():
     assert torch.allclose(m(x)[0], y)
 
 
-@pytest.mark.skip("Not yet supported")
-def test_extrac_recurrent():
-    w = np.random.randn(1, 1)
-    g = nir.NIRGraph(
-        nodes={"in": nir.Input(np.ones(1)), "a": nir.Linear(w), "b": nir.Linear(w)},
-        edges=[("in", "a"), ("a", "b"), ("b", "a")],
-    )
-    l1 = torch.nn.Linear(1, 1, bias=False)
-    l1.weight.data = torch.tensor(w).float()
-    l2 = torch.nn.Linear(1, 1, bias=False)
-    l2.weight.data = torch.tensor(w).float()
-    m = load(g, _torch_model_map)
-    data = torch.randn(1, 1, dtype=torch.float32)
-    torch.allclose(m(data)[0], l2(l1(data)))
-
-
 def test_execute_stateful():
     class StatefulModel(torch.nn.Module):
         def __init__(self):
@@ -171,3 +157,53 @@ def test_import_braille():
     g = nir.read("tests/braille.nir")
     m = load(g, _recurrent_model_map)
     assert m(torch.empty(1, 12))[0].shape == (1, 7)
+
+
+def test_deprecation_warning():
+    g = nir.read("tests/braille.nir")
+    with warnings.catch_warnings(record=True) as warn:
+        m = load(g, _recurrent_model_map)
+        assert len(warn) == 1
+        assert isinstance(warn[0].message, DeprecationWarning)
+
+
+##############################
+####### Torch FX tests
+##############################
+
+
+def _map_affine_node(m: nir.Affine):
+    lin = torch.nn.Linear(*m.weight.shape[-2:])
+    lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).float())
+    lin.bias.data = torch.nn.Parameter(torch.tensor(m.bias).float())
+    return lin
+
+
+def _map_linear_node(m: nir.Affine):
+    lin = torch.nn.Linear(*m.weight.shape[-2:], bias=False)
+    lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).float())
+    return lin
+
+
+def _map_identity(m: nir.NIRNode):
+    return torch.nn.Identity()
+
+
+_torch_node_map = {
+    nir.Affine: _map_affine_node,
+    nir.Linear: _map_linear_node,
+    nir.CubaLIF: _map_identity,
+}
+
+
+def test_from_nir_fx():
+    w = np.random.random((1, 2))
+    g = nir.NIRGraph.from_list(nir.Linear(w))
+    with warnings.catch_warnings(record=True) as warn:
+        m = load(g, _torch_node_map)
+        assert len(warn) == 0
+
+    assert m(torch.empty(2))[0].shape == (1,)
+
+
+# TODO: Test import of braille
