@@ -175,4 +175,6 @@ def test_ignore_time_and_batch_dim():
 def test_deprecation_warning():
     with warnings.catch_warnings(record=True) as warn:
         m = nn.Linear(1, 1)
-        g = extract_nir_graph(m, _node_to_affine, torch.rand(1, 1))
+        extract_nir_graph(m, _node_to_affine, torch.rand(1, 1))
+        assert len(warn) == 1
+        assert isinstance(warn[0].message, DeprecationWarning)

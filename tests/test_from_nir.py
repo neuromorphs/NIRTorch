@@ -6,7 +6,6 @@ import pytest
 import torch
 
 from nirtorch.from_nir import load
-from nirtorch.nir_interpreter import nir_to_torch
 
 
 def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:

@@ -1,5 +1,4 @@
 import pytest
-import warnings
 
 import nir
 import numpy as np

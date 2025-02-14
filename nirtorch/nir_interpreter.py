@@ -95,7 +95,10 @@ def _construct_module_dict_recursive(
 
 
 def _find_input_nodes(
-    name: str, edges: typing.List[typing.Tuple[str, str]], node_outputs: typing.Dict[str, torch.fx.Node]):
+    name: str,
+    edges: typing.List[typing.Tuple[str, str]],
+    node_outputs: typing.Dict[str, torch.fx.Node],
+):
     """
     Looks through the edges and find nodes that are connected to the given node as inputs.
     If one of the inputs doesn't exist because it hasn't been defined, we return None.
@@ -147,10 +150,12 @@ def _construct_fx_graph(
     while module_queue:
         module_name, module = module_queue.popleft()
         if recursion_counter[module_name] > 3:
-            raise RecursionError(f"Module {module_name} has been traversed multiple times"
-                                 " which may be a bug in the graph or in the implementation."
-                                 " Please file an issue at github.com/neuromorphs/nirtorch")
-        
+            raise RecursionError(
+                f"Module {module_name} has been traversed multiple times"
+                " which may be a bug in the graph or in the implementation."
+                " Please file an issue at github.com/neuromorphs/nirtorch"
+            )
+
         if isinstance(module, nir.Input):
             if len(module.output_type) > 1:
                 raise ValueError("Multiple inputs are currently not supported")
@@ -177,7 +182,9 @@ def _construct_fx_graph(
                     raise ValueError("Multiple outputs are currently not supported")
                 for input_name, output in module.input_type.items():
                     # First fetch the required input nodes
-                    module_input_nodes = _find_input_nodes(module_name, edges=nir_graph.edges, node_outputs=node_outputs)
+                    module_input_nodes = _find_input_nodes(
+                        module_name, edges=nir_graph.edges, node_outputs=node_outputs
+                    )
                     # If the module uses input that is not yet defined, set the inputs to some dummy value
                     # and enqueue the module again for processing (where it's hopefully defined)
                     if None in module_input_nodes:
@@ -190,7 +197,9 @@ def _construct_fx_graph(
                     #     for index, input_node in enumerate(module_input_nodes):
                     #         output_node.update_arg(index, input_node)
                     # If it has not been visited before, add the node
-                    node_outputs[module_name] = torch_graph.output((*module_input_nodes, state_argument))
+                    node_outputs[module_name] = torch_graph.output(
+                        (*module_input_nodes, state_argument)
+                    )
         else:
             # 1. Recursively wire subgraphs
             if isinstance(module, nir.NIRGraph):
@@ -208,14 +217,16 @@ def _construct_fx_graph(
                 )
             # - If the module uses input that is not yet defined, set the input to some dummy values
             #   and enqueue the module again for processing (where it's hopefully defined)
-            module_input_nodes = _find_input_nodes(module_name, nir_graph.edges, node_outputs=node_outputs)
+            module_input_nodes = _find_input_nodes(
+                module_name, nir_graph.edges, node_outputs=node_outputs
+            )
             if None in module_input_nodes:
                 # This module depends on another module that hasn't yet been constructed
                 module_input_nodes = tuple([dummy_input for _ in module_input_nodes])
                 # Enqueue for later processing
                 module_queue.append((module_name, module))
             # else:
-            
+
             # # If the node was visited before, update the new inputs
             # if recursion_counter[module_name] > 1:
             #     output_node = node_outputs[module_name]
@@ -246,7 +257,7 @@ def _construct_fx_graph(
                 # - If the output is not a tuple, return as normal
                 else:
                     node_outputs[module_name] = output
-        
+
         recursion_counter[module_name] += 1
 
     # Ensure correctness

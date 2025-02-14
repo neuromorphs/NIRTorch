@@ -52,7 +52,7 @@ _torch_node_map = {
     nir.Linear: _map_linear_node,
     nir.CubaLIF: _map_identity,
     nir.LIF: _map_identity,
-    nir.LI: _map_li
+    nir.LI: _map_li,
 }
 
 
@@ -206,30 +206,33 @@ def test_map_nested_subgraph_default():
     assert out[0].shape == (2,)
 
 
-
 def test_can_overwrite_default_map():
     w = np.random.random((2, 3)).astype(np.float32)
     linear = nir.Linear(w)
     graph = nir.NIRGraph.from_list(linear)
     state = {"called": False}
+
     def mock_linear_map(node: nir.Linear):
         state["called"] = True
         return torch.nn.Linear(2, 3)
+
     nir_interpreter.nir_to_torch(graph, {nir.Linear: mock_linear_map})
     assert state["called"]
+
 
 def test_map_out_of_order():
     w = np.random.random((2, 3)).astype(np.float32)
     nodes = {
         "linear": nir.Linear(w),
         "input": nir.Input(np.array([2])),
-        "output": nir.Output(np.array([3]))
+        "output": nir.Output(np.array([3])),
     }
     edges = [("input", "linear"), ("linear", "output")]
     graph = nir.NIRGraph(nodes, edges)
     module = nir_interpreter.nir_to_torch(graph, {nir.Linear: _map_linear_node})
     data = torch.rand(3)
     assert torch.allclose(module(data)[0], torch.from_numpy(w) @ data)
+
 
 # TODO: Implement recursive calls
 @pytest.mark.skip("Recursion is not implemented yet")
@@ -238,14 +241,14 @@ def test_map_recursive_graph():
     nodes = {
         "linear": nir.Linear(w),
         "input": nir.Input(np.array([2])),
-        "output": nir.Output(np.array([3]))
+        "output": nir.Output(np.array([3])),
     }
     edges = [("linear", "linear"), ("input", "linear"), ("linear", "output")]
     graph = nir.NIRGraph(nodes, edges)
     module = nir_interpreter.nir_to_torch(graph, {nir.Linear: _map_linear_node})
     data = torch.rand(2)
     assert torch.allclose(module(data), data @ torch.from_numpy(w))
-    
+
 
 ##########################################
 #### Integration tests
