@@ -6,6 +6,7 @@ import pytest
 import torch
 
 from nirtorch.from_nir import load
+from nirtorch.nir_interpreter import nir_to_torch
 
 
 def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
@@ -165,45 +166,3 @@ def test_deprecation_warning():
         load(g, _recurrent_model_map)
         assert len(warn) == 1
         assert isinstance(warn[0].message, DeprecationWarning)
-
-
-##############################
-####### Torch FX tests
-##############################
-
-
-def _map_affine_node(m: nir.Affine):
-    lin = torch.nn.Linear(*m.weight.shape[-2:])
-    lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).float())
-    lin.bias.data = torch.nn.Parameter(torch.tensor(m.bias).float())
-    return lin
-
-
-def _map_linear_node(m: nir.Affine):
-    lin = torch.nn.Linear(*m.weight.shape[-2:], bias=False)
-    lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).float())
-    return lin
-
-
-def _map_identity(m: nir.NIRNode):
-    return torch.nn.Identity()
-
-
-_torch_node_map = {
-    nir.Affine: _map_affine_node,
-    nir.Linear: _map_linear_node,
-    nir.CubaLIF: _map_identity,
-}
-
-
-def test_from_nir_fx():
-    w = np.random.random((1, 2))
-    g = nir.NIRGraph.from_list(nir.Linear(w))
-    with warnings.catch_warnings(record=True) as warn:
-        m = load(g, _torch_node_map)
-        assert len(warn) == 0
-
-    assert m(torch.empty(2))[0].shape == (1,)
-
-
-# TODO: Test import of braille

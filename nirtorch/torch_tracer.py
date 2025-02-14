@@ -5,10 +5,9 @@ import numpy as np
 
 import nir
 import torch
-from torch.fx import GraphModule, Node, Tracer, Transformer
 
 
-class NIRTorchTracer(Tracer):
+class NIRTorchTracer(torch.fx.Tracer):
 
     def __init__(self, custom_leaf_modules: Tuple[torch.nn.Module] = None, **kwargs):
         """Extends PyTorch's default symbolic tracing with a set of custom leaf nodes"""
@@ -45,7 +44,7 @@ class NIRTorchTracer(Tracer):
         return super().is_leaf_module(m, module_qualified_name)
 
 
-class NIRTorchTransformer(Transformer):
+class NIRTorchTransformer(torch.fx.Transformer):
     def call_function(self, target: str, args: Tuple, kwargs: Dict) -> Any:
         print("sup", target)
         return super().call_function(target, args, kwargs)
@@ -58,7 +57,7 @@ class NIRTorchTransformer(Transformer):
         return super().call_module(target, args, kwargs)
 
 
-def trace_torch_graph(
+def torch_to_nir(
     module: torch.nn.Module,
     module_map: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]],
     default_dict: Optional[
@@ -93,7 +92,7 @@ def trace_torch_graph(
             "The module is a leaf node, but does not appear in the module map. We cannot trace it further"
         )
 
-    graph_module = GraphModule(tracer.root, traced)
+    graph_module = torch.fx.GraphModule(tracer.root, traced)
 
     # Create NIR nodes
     nodes = {}
@@ -101,7 +100,7 @@ def trace_torch_graph(
     ignored_nodes = set()
     skipped_nodes = set()
 
-    def _find_users(node: Node) -> Set[Node]:
+    def _find_users(node: torch.fx.Node) -> Set[torch.fx.Node]:
         """
         Finds all the users (outputs) of a given node, recursively if the node is registered as a skipped node
         """
@@ -115,7 +114,7 @@ def trace_torch_graph(
                 nodes.add(user)
         return nodes
 
-    def _find_inputs(node: Node) -> Set[Node]:
+    def _find_inputs(node: torch.fx.Node) -> Set[torch.fx.Node]:
         """
         Finds all the inputs (inputs) of a given node, recursively if the node is registered as a skipped node
         """
@@ -198,7 +197,7 @@ def trace_torch_graph(
 
 if __name__ == "__main__":
     module = torch.nn.Sequential(torch.nn.Linear(2, 1), torch.nn.Linear(1, 1))
-    graph = trace_torch_graph(module)
+    graph = torch_to_nir(module)
 
     import pprint
 

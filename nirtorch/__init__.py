@@ -1,5 +1,15 @@
 from .from_nir import load  # noqa F401
-from .graph import extract_torch_graph  # noqa F401
-from .to_nir import extract_nir_graph, trace_nir_graph  # noqa F401
+from .to_nir import extract_nir_graph  # noqa F401
+from .nir_interpreter import nir_to_torch
+from .torch_tracer import torch_to_nir
 
 __version__ = version = "1.0"
+
+
+__all__ = [
+    "extract_torch_graph",
+    "extract_nir_graph",
+    "load",
+    "nir_to_torch",
+    "torch_to_nir",
+]

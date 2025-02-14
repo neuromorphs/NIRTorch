@@ -50,9 +50,9 @@ def extract_nir_graph(
         nir.NIR: Returns the generated NIR graph representation.
     """
     warnings.warn(
-        "extract_nir_graph is deprecated, use trace_nir_graph instead",
+        "nirtorch.extract_nir_graph is being deprecated in favour of nirtorch.torch_to_nir. "
+        "Please refer to https://neuroir.org/docs/dev_pytorch.html for detailed instructions",
         DeprecationWarning,
-        stacklevel=2,
     )
 
     if len(list(model.children())):
@@ -167,31 +167,3 @@ def extract_nir_graph(
             nir_edges.remove(edge)
 
     return nir.NIRGraph(nir_nodes, nir_edges)
-
-
-def trace_nir_graph(
-    model: nn.Module,
-    model_map: Dict[nn.Module, Callable[[nn.Module], nir.NIRNode]],
-    default_map: Optional[
-        Dict[nn.Module, Callable[[nn.Module], nir.NIRNode]]
-    ] = DEFAULT_MAPS,
-    model_name: Optional[str] = "model",
-    ignore_submodules_of=None,
-    model_fwd_args=[],
-    ignore_dims: Optional[Sequence[int]] = None,
-) -> nir.NIRNode:
-    """
-    Given a PyTorch `model`, we trace it and recreate a NIR graph using the specified `model_map`.
-
-    Args:
-        model (nn.Module): The model of interest
-        model_map (Dict[nn.Module, Callable[[nn.Module], nir.NIRNode]]): A dictionary that maps
-            a given module type to a function that can convert the model to an NIRNode type
-        model_name (Optional[str], optional): The name of the top level module.
-            Defaults to "model".
-        ignore_submodules_of (Optional[Sequence[nn.Module]]): If specified,
-            the corresponding module's children will not be traversed for graph.
-        ignore_dims (Optional[Sequence[int]]): Dimensions of data to be ignored for
-            type/shape inference. Typically the dimensions that you will want to ignore
-            are for batch and time.
-    """

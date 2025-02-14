@@ -7,7 +7,6 @@ import torch.nn as nn
 
 from .graph import TorchGraph
 from .graph_executor import GraphExecutor
-from .interpreter import to_torch, NodeMapType
 from .utils import sanitize_name
 
 
@@ -27,6 +26,7 @@ def _map_graph_to_torch(
     model_map: Callable[[nn.Module], nn.Module],
     return_state: bool = True,
 ) -> nir.NIRNode:
+
     nodes = {}
     for name, node in nir_graph.nodes.items():
         mapped_module = model_map(node)
@@ -50,7 +50,7 @@ def _map_graph_to_torch(
 
 def load(
     nir_graph: Union[nir.NIRNode, str],
-    model_map: Union[Callable[[nir.NIRNode], nn.Module], NodeMapType],
+    model_map: Callable[[nir.NIRNode], nn.Module],
     return_state: bool = True,
 ) -> nn.Module:
     """Load a NIR graph and convert it to a torch module using the given model map.
@@ -77,22 +77,12 @@ def load(
     Returns:
         nn.Module: The generated torch module
     """
+    warnings.warn(
+        "nirtorch.load is being deprecated in favour of nirtorch.nir_to_torch. "
+        "Please refer to https://neuroir.org/docs/dev_pytorch.html for detailed instructions",
+        DeprecationWarning,
+    )
+
     if isinstance(nir_graph, str):
         nir_graph = nir.read(nir_graph)
-
-    # TODO: Deprecate the old model map type
-    if isinstance(model_map, Callable):
-        warnings.warn(
-            "You are using an old call to nirtorch.load. "
-            "Please refer to https://github.com/neuromorphs/NIRTorch/pull/28 for instructions",
-            DeprecationWarning,
-        )
-        # Convert the NIR graph to a torch graph
-        return _map_graph_to_torch(nir_graph, model_map, return_state=return_state)
-    else:
-        if not return_state:
-            warnings.warn(
-                "return_state is deprecated and will be removed in future releases",
-                DeprecationWarning,
-            )
-        return to_torch(nir_graph, node_map=model_map)
+    return _map_graph_to_torch(nir_graph, model_map, return_state=return_state)

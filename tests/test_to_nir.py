@@ -1,3 +1,5 @@
+import warnings
+
 import nir
 import numpy as np
 import pytest
@@ -168,3 +170,9 @@ def test_ignore_time_and_batch_dim():
 #     assert len(graph.nodes) == 4
 #     assert len(graph.edges) == 3
 #     assert graph.edges[0] == (0, 1)
+
+
+def test_deprecation_warning():
+    with warnings.catch_warnings(record=True) as warn:
+        m = nn.Linear(1, 1)
+        g = extract_nir_graph(m, _node_to_affine, torch.rand(1, 1))
