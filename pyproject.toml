@@ -31,9 +31,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [ "torch", "nir" ]
-dynamic = ["version"] # Version number read from __init__.py
+dynamic = ["version"] # Load the version from setuptools_scm
 
-[tool.setuptools_scm] 
-
-[tool.setuptools.dynamic]
-version = {attr = "nirtorch.__version__"}
+[tool.setuptools_scm]
