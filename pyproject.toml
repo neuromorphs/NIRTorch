@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools"]
+requires = [
+  "setuptools>=60",
+  "setuptools-scm>=8.0"
+]
 
 [project]
 name = "nirtorch"
@@ -16,7 +19,7 @@ authors = [
 readme = "README.md"
 keywords = ["neuromorphic", "intermediate", "representation"]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: BSD License",
@@ -29,6 +32,8 @@ classifiers = [
 ]
 dependencies = [ "torch", "nir" ]
 dynamic = ["version"] # Version number read from __init__.py
+
+[tool.setuptools_scm] 
 
 [tool.setuptools.dynamic]
 version = {attr = "nirtorch.__version__"}

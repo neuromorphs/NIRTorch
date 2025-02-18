@@ -1,3 +1,12 @@
+from importlib.metadata import version as metadata_version, PackageNotFoundError
+
+try:
+    __version__ = version = metadata_version("nir")
+    del metadata_version
+except PackageNotFoundError:
+    # package is not installed
+    pass
+
 from .from_nir import load  # noqa F401
 from .to_nir import extract_nir_graph  # noqa F401
 from .nir_interpreter import nir_to_torch
