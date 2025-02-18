@@ -138,6 +138,8 @@ def _construct_fx_graph(
 ) -> torch.fx.GraphModule:
     node_outputs = {}
     recursion_counter = collections.Counter(nir_graph.nodes.keys())
+    # The maximum iterations per node (see https://github.com/neuromorphs/NIRTorch/pull/28#discussion_r1959343951)
+    max_iterations = min(3, len(recursion_counter))
     torch_graph = torch.fx.Graph(owning_module)
     # Create a queue of the modules where we can re-insert modules for re-processing
     # in case of self-reference or if the graph is given out of order
@@ -149,7 +151,7 @@ def _construct_fx_graph(
     # Loop through all the nodes in the queue
     while module_queue:
         module_name, module = module_queue.popleft()
-        if recursion_counter[module_name] > 3:
+        if recursion_counter[module_name] > max_iterations:
             raise RecursionError(
                 f"Module {module_name} has been traversed multiple times"
                 " which may be a bug in the graph or in the implementation."
@@ -158,7 +160,7 @@ def _construct_fx_graph(
 
         if isinstance(module, nir.Input):
             if len(module.output_type) > 1:
-                raise ValueError("Multiple inputs are currently not supported")
+                raise NotImplementedError("Multiple inputs are currently not supported")
             for input_name, _ in module.input_type.items():
                 node_outputs[module_name] = torch_graph.create_node(
                     "placeholder", input_name
@@ -225,13 +227,6 @@ def _construct_fx_graph(
                 module_input_nodes = tuple([dummy_input for _ in module_input_nodes])
                 # Enqueue for later processing
                 module_queue.append((module_name, module))
-            # else:
-
-            # # If the node was visited before, update the new inputs
-            # if recursion_counter[module_name] > 1:
-            #     output_node = node_outputs[module_name]
-            #     for index, input_node in enumerate(module_input_nodes):
-            #         output_node.update_arg(index, input_node)
             # Otherwise, call the module as usual
             else:
                 output = torch_graph.call_module(

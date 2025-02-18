@@ -98,17 +98,17 @@ def torch_to_nir(
     nodes = {}
     edges = []
     ignored_nodes = set()
-    skipped_nodes = set()
+    bypass_nodes = set()
 
     def _find_users(node: torch.fx.Node) -> Set[torch.fx.Node]:
         """
-        Finds all the users (outputs) of a given node, recursively if the node is registered as a skipped node
+        Finds all the users (outputs) of a given node, recursively if the node is registered as a bypass node
         """
         nodes = set()
         for user in node.users:
             if user in ignored_nodes:
                 continue
-            elif user in skipped_nodes:
+            elif user in bypass_nodes:
                 nodes |= _find_users(user)
             else:
                 nodes.add(user)
@@ -116,13 +116,13 @@ def torch_to_nir(
 
     def _find_inputs(node: torch.fx.Node) -> Set[torch.fx.Node]:
         """
-        Finds all the inputs (inputs) of a given node, recursively if the node is registered as a skipped node
+        Finds all the inputs (inputs) of a given node, recursively if the node is registered as a circumvented node
         """
         nodes = set()
         for in_node in node.all_input_nodes:
             if in_node in ignored_nodes:
                 continue
-            elif in_node in skipped_nodes:
+            elif in_node in bypass_nodes:
                 nodes |= _find_inputs(in_node)
             else:
                 nodes.add(in_node)
@@ -139,20 +139,20 @@ def torch_to_nir(
         elif node.op == "output":
             nodes[str(node.name)] = nir.Output(np.array([1]))
         elif node.op == "call_function":
-            # Ensure that we skip add nodes
+            # Ensure that we bypass add nodes
             # TODO: Consider using transformations for this
             #       https://pytorch.org/docs/stable/fx.html#torch.fx.Transformer
             if node.target == operator.add:
-                skipped_nodes.add(node)
+                bypass_nodes.add(node)
             # Raise a warning if we encounter other methods than addition
             else:
                 raise ValueError(
                     "The only supported function is addition. Please modify your model or raise an issue on GitHub"
                 )
         elif node.op == "call_method":
-            # Skip add methods
+            # Bypass add methods
             if node.target == "add":
-                skipped_nodes.add(node)
+                bypass_nodes.add(node)
             else:
                 raise ValueError(
                     "The only supported method is addition. Please modify your model or raise an issue on GitHub"
@@ -162,8 +162,8 @@ def torch_to_nir(
             nir_module = module_map[torch_module.__class__](torch_module)
             nodes[str(node.name)] = nir_module
         elif node.op == "get_attr":
-            # Skip attribute
-            skipped_nodes.add(node)
+            # Bypass attribute
+            bypass_nodes.add(node)
         else:
             raise ValueError(
                 f"Unsupported operation {node.op}. Please modify your model or raise an issue on GitHub"
@@ -178,10 +178,10 @@ def torch_to_nir(
 
         # Add edges
         for in_node in node.all_input_nodes:
-            if in_node in ignored_nodes or in_node in skipped_nodes:
+            if in_node in ignored_nodes or in_node in bypass_nodes:
                 continue
-            # If the function is set to be skipped, we simply forward the input to all the outputs
-            if node in skipped_nodes:
+            # If the function is set to be bypassed, we simply forward the input to all the outputs
+            if node in bypass_nodes:
                 for next_node in _find_users(node):
                     edges.append((in_node.name, next_node.name))
             # Ignore additions as incoming edges
