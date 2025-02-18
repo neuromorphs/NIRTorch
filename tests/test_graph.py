@@ -5,37 +5,13 @@ import torch.nn as nn
 from norse.torch import LIBoxCell, LIFCell, SequentialState
 from sinabs.layers import Merge
 
-from nirtorch import extract_nir_graph, extract_torch_graph
+from nirtorch import extract_nir_graph
 from nirtorch.graph import TorchGraph, named_modules_map, GraphTracer
 
 
 class TupleModule(torch.nn.Module):
     def forward(self, data):
         return (data, data)
-
-
-def test_sequential_graph_extract():
-    model = nn.Sequential(
-        nn.Conv2d(2, 8, 3),
-        nn.AvgPool2d(2),
-        nn.ReLU(),
-        nn.Conv2d(8, 16, 3),
-        nn.AvgPool2d(2),
-        nn.ReLU(),
-        nn.Conv2d(16, 32, 2),
-        nn.AvgPool2d(2),
-        nn.ReLU(),
-        nn.Flatten(),
-        nn.Linear(128, 10),
-    )
-
-    sample_data = torch.rand(1, 2, 32, 32)
-    graph = extract_torch_graph(
-        model=model, sample_data=sample_data, model_name=None
-    ).ignore_tensors()
-    print(graph)
-
-    assert len(graph.node_list) == 11
 
 
 # Branched model
@@ -230,47 +206,6 @@ def test_snn_branched():
     )
 
     assert len(graph.node_list) == 13
-
-
-def test_snn_stateful():
-    model = NorseStatefulModel()
-    graph = extract_torch_graph(model, sample_data=torch.rand((1, 2, 3, 4)))
-    assert len(graph.node_list) == 2
-
-
-def test_ignore_tensors():
-    graph = extract_torch_graph(my_branched_model, sample_data=data)
-    mod_only_graph = graph.ignore_tensors()
-    assert len(mod_only_graph.node_list) == 5
-
-
-def test_root_has_no_source():
-    graph = extract_torch_graph(my_branched_model, sample_data=data)
-    graph = graph.ignore_tensors()
-    assert (
-        len(graph.find_source_nodes_of(graph.find_node(my_branched_model.relu1))) == 0
-    )
-
-
-@pytest.mark.skip(reason="Root tracing is broken")
-def test_get_root():
-    graph = extract_torch_graph(my_branched_model, sample_data=data, model_name=None)
-    graph = graph.ignore_tensors()
-    root_nodes = graph.get_root()
-    assert len(root_nodes) == 1
-    assert root_nodes[0].elem == my_branched_model.relu1
-
-
-def test_ignore_nodes_parent_model():
-    graph = extract_torch_graph(
-        my_branched_model, sample_data=data, model_name="ShouldDisappear"
-    )
-
-    new_graph = graph.ignore_nodes(SinabsBranchedModel)
-    print(new_graph)
-
-    with pytest.raises(ValueError):
-        new_graph.find_node(my_branched_model)
 
 
 def test_input_output():

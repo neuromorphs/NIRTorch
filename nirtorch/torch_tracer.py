@@ -1,0 +1,204 @@
+from typing import Any, Callable, Dict, Set, Tuple, Optional
+import operator
+
+import numpy as np
+
+import nir
+import torch
+
+
+class NIRTorchTracer(torch.fx.Tracer):
+
+    def __init__(self, custom_leaf_modules: Tuple[torch.nn.Module] = None, **kwargs):
+        """Extends PyTorch's default symbolic tracing with a set of custom leaf nodes"""
+        super().__init__(**kwargs)
+        if custom_leaf_modules is not None and not isinstance(
+            custom_leaf_modules, tuple
+        ):
+            custom_leaf_modules = tuple(custom_leaf_modules)
+        self.custom_leaf_modules = custom_leaf_modules
+
+    def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
+        """
+        A method to specify whether a given ``nn.Module`` is a "leaf" module.
+        Leaf modules are the atomic units that appear in
+        the IR, referenced by ``call_module`` calls. By default,
+        Modules in the PyTorch standard library namespace (torch.nn)
+        are leaf modules. All other modules are traced through and
+        their constituent ops are recorded, unless specified otherwise
+        via this parameter.
+        Args:
+            m (Module): The module being queried about
+            module_qualified_name (str): The path to root of this module. For example,
+                if you have a module hierarchy where submodule ``foo`` contains
+                submodule ``bar``, which contains submodule ``baz``, that module will
+                appear with the qualified name ``foo.bar.baz`` here.
+        """
+        # Tests that the module is in the list of custom leaves
+        if self.custom_leaf_modules and isinstance(m, self.custom_leaf_modules):
+            return True
+
+        if hasattr(m, "_is_leaf_module") and m._is_leaf_module:
+            return True
+
+        return super().is_leaf_module(m, module_qualified_name)
+
+
+class NIRTorchTransformer(torch.fx.Transformer):
+    def call_function(self, target: str, args: Tuple, kwargs: Dict) -> Any:
+        print("sup", target)
+        return super().call_function(target, args, kwargs)
+
+    def call_method(self, target: str, args: Tuple, kwargs: Dict) -> Any:
+        return super().call_method(target, args, kwargs)
+
+    def call_module(self, target, args, kwargs):
+        print("mod", target)
+        return super().call_module(target, args, kwargs)
+
+
+def torch_to_nir(
+    module: torch.nn.Module,
+    module_map: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]],
+    default_dict: Optional[
+        Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]
+    ] = None,
+) -> nir.NIRGraph:
+    """
+    Traces a PyTorch module and converts it to a NIR graph using the specified module map.
+
+    Args:
+        module (torch.nn.Module): The module of interest
+        module_map (Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]): A dictionary that maps
+            a given module type to a function that can convert the model to an NIRNode type
+        default_dict (Optional[Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]]): An optional dictionary that maps
+            a given module type to a function that can convert the model to an NIRNode type. This dictionary is merged
+            with the module_map dictionary.
+    """
+    # Merge the default dictionary, if it exists
+    if default_dict is not None:
+        module_map = module_map | default_dict
+
+    # Cover the edge case that the incoming module is a leaf node
+    if module.__class__ in module_map:
+        return module_map[module.__class__](module)
+
+    # Trace the graph
+    tracer = NIRTorchTracer(module_map.keys())
+    traced = tracer.trace(module)
+
+    if len(traced.nodes) == 2 and len(list(tracer.root.children())) == 0:
+        raise ValueError(
+            "The module is a leaf node, but does not appear in the module map. We cannot trace it further"
+        )
+
+    graph_module = torch.fx.GraphModule(tracer.root, traced)
+
+    # Create NIR nodes
+    nodes = {}
+    edges = []
+    ignored_nodes = set()
+    bypass_nodes = set()
+
+    def _find_users(node: torch.fx.Node) -> Set[torch.fx.Node]:
+        """
+        Finds all the users (outputs) of a given node, recursively if the node is registered as a bypass node
+        """
+        nodes = set()
+        for user in node.users:
+            if user in ignored_nodes:
+                continue
+            elif user in bypass_nodes:
+                nodes |= _find_users(user)
+            else:
+                nodes.add(user)
+        return nodes
+
+    def _find_inputs(node: torch.fx.Node) -> Set[torch.fx.Node]:
+        """
+        Finds all the inputs (inputs) of a given node, recursively if the node is registered as a circumvented node
+        """
+        nodes = set()
+        for in_node in node.all_input_nodes:
+            if in_node in ignored_nodes:
+                continue
+            elif in_node in bypass_nodes:
+                nodes |= _find_inputs(in_node)
+            else:
+                nodes.add(in_node)
+        return nodes
+
+    for node in traced.nodes:
+        # Add Node
+        if node.op == "placeholder":
+            if node.target == "input" or node.prev.op == "root":
+                nodes[str(node.name)] = nir.Input(np.array([1]))
+            else:
+                ignored_nodes.add(node)
+                continue
+        elif node.op == "output":
+            nodes[str(node.name)] = nir.Output(np.array([1]))
+        elif node.op == "call_function":
+            # Ensure that we bypass add nodes
+            # TODO: Consider using transformations for this
+            #       https://pytorch.org/docs/stable/fx.html#torch.fx.Transformer
+            if node.target == operator.add:
+                bypass_nodes.add(node)
+            # Raise a warning if we encounter other methods than addition
+            else:
+                raise ValueError(
+                    "The only supported function is addition. Please modify your model or raise an issue on GitHub"
+                )
+        elif node.op == "call_method":
+            # Bypass add methods
+            if node.target == "add":
+                bypass_nodes.add(node)
+            else:
+                raise ValueError(
+                    "The only supported method is addition. Please modify your model or raise an issue on GitHub"
+                )
+        elif node.op == "call_module":
+            torch_module = graph_module.get_submodule(node.target)
+            nir_module = module_map[torch_module.__class__](torch_module)
+            nodes[str(node.name)] = nir_module
+        elif node.op == "get_attr":
+            # Bypass attribute
+            bypass_nodes.add(node)
+        else:
+            raise ValueError(
+                f"Unsupported operation {node.op}. Please modify your model or raise an issue on GitHub"
+            )
+
+    # Create edges
+    # - This is done in a separate loop to ensure that we correctly ignore the edges in case the nodes
+    #   are ignored out-of-order
+    for node in traced.nodes:
+        if node in ignored_nodes:
+            continue
+
+        # Add edges
+        for in_node in node.all_input_nodes:
+            if in_node in ignored_nodes or in_node in bypass_nodes:
+                continue
+            # If the function is set to be bypassed, we simply forward the input to all the outputs
+            if node in bypass_nodes:
+                for next_node in _find_users(node):
+                    edges.append((in_node.name, next_node.name))
+            # Ignore additions as incoming edges
+            elif in_node.op == "call_function" and in_node.target == operator.add:
+                break
+            # Otherwise, add an edge
+            elif in_node not in ignored_nodes:
+                edges.append((in_node.name, node.name))
+    graph = nir.NIRGraph(nodes=nodes, edges=edges)
+    graph.infer_types()
+    return graph
+
+
+if __name__ == "__main__":
+    module = torch.nn.Sequential(torch.nn.Linear(2, 1), torch.nn.Linear(1, 1))
+    graph = torch_to_nir(module)
+
+    import pprint
+
+    pprint.pprint(graph)

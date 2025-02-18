@@ -1,11 +1,21 @@
 import logging
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Dict, Optional, Sequence
+import warnings
 
 import nir
 import numpy as np
 import torch.nn as nn
 
 from .graph import extract_torch_graph
+
+
+DEFAULT_MAPS: Dict[nn.Module, Callable[[nn.Module], nir.NIRNode]] = {
+    nn.Linear: (
+        lambda module: nir.Affine(
+            module.weight.detach().numpy(), module.bias.detach().numpy()
+        )
+    )
+}
 
 
 def extract_nir_graph(
@@ -39,6 +49,11 @@ def extract_nir_graph(
     Returns:
         nir.NIR: Returns the generated NIR graph representation.
     """
+    warnings.warn(
+        "nirtorch.extract_nir_graph is being deprecated in favour of nirtorch.torch_to_nir. "
+        "Please refer to https://neuroir.org/docs/dev_pytorch.html for detailed instructions",
+        DeprecationWarning,
+    )
 
     if len(list(model.children())):
         # If the model has submodules, ignore the top level module

@@ -1,3 +1,4 @@
+import warnings
 from typing import Callable, Optional, Union
 
 import nir
@@ -25,6 +26,7 @@ def _map_graph_to_torch(
     model_map: Callable[[nn.Module], nn.Module],
     return_state: bool = True,
 ) -> nir.NIRNode:
+
     nodes = {}
     for name, node in nir_graph.nodes.items():
         mapped_module = model_map(node)
@@ -53,13 +55,11 @@ def load(
 ) -> nn.Module:
     """Load a NIR graph and convert it to a torch module using the given model map.
 
-    Because the graph can contain recurrence and stateful modules, the execution accepts
-    a secondary state argument and returns a tuple of [output, state], instead of just
-    the output as follows
+    Because the graph can contain recurrence and stateful modules.
 
+    >>> map = {nir.LI: lambda li: MyLIModule(li.tau, li.r, li.v_leak)}
     >>> executor = nirtorch.load(nir_graph, model_map)
-    >>> old_state = None
-    >>> output, state = executor(input, old_state) # Notice second argument and output
+    >>> output, state = executor(input) # Note the state return value
     >>> output, state = executor(input, state) # This can go on for many (time)steps
 
     If you do not wish to operate with state, set `return_state=False`.
@@ -77,7 +77,12 @@ def load(
     Returns:
         nn.Module: The generated torch module
     """
+    warnings.warn(
+        "nirtorch.load is being deprecated in favour of nirtorch.nir_to_torch. "
+        "Please refer to https://neuroir.org/docs/dev_pytorch.html for detailed instructions",
+        DeprecationWarning,
+    )
+
     if isinstance(nir_graph, str):
         nir_graph = nir.read(nir_graph)
-    # Convert the NIR graph to a torch graph
     return _map_graph_to_torch(nir_graph, model_map, return_state=return_state)
