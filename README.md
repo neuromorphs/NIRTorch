@@ -1,4 +1,15 @@
-# NIRTorch
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="https://github.com/neuromorphs/NIR/raw/main/docs/logo_dark.png">
+<img alt="NIR Logo" src="https://github.com/neuromorphs/NIR/raw/main/docs/logo_light.png">
+</picture>
+
+# NIRTorch - Torch for the Neuromorphic Intermediate Representation
+
+[![Nature Communications Paper](https://zenodo.org/badge/DOI/10.1038/s41467-024-52259-9.svg)](https://doi.org/10.1038/s41467-024-52259-9)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/nirtorch?logo=pypi)](https://pypi.org/project/nir/)
+[![GitHub Tag](https://img.shields.io/github/v/tag/neuromorphs/nirtorch?logo=github)](https://github.com/neuromorphs/NIR/releases)
+[![Discord](https://img.shields.io/discord/1209533869733453844?logo=discord)](https://discord.gg/JRMRGP9h3c)
+
 
 PyTorch helpers for the [Neuromorphic Intermediate Representation (NIR)](https://github.com/neuromorphs/nir).
 This is a no frills python package to enable torch based libraries to translate to NIR.
