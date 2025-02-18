@@ -10,54 +10,89 @@ pip install nirtorch
 
 ## Usage
 
-NIRTorch is typically only interfaced by library/hardwarae developers.
-NIRTorch provides the `extract_nir_graph` function that takes as input a `torch.nn.Module` and a means to map Torch modules into NIR nodes.
-An NIR node is an element in the NIR compute graph, corresponding to neuromorphic ODEs.
+> [!TIP]
+> Read the full documentation at [neuroir.org/docs](https://neuroir.org/docs/dev_pytorch.html).
 
-Here is an example from the [Norse](https://github.com/norse/norse) library:
+
+NIRTorch is typically only interfaced by library/hardwarae developers.
+NIRTorch provides two functions `nir_to_torch` and `torch_to_nir` that maps NIR graphs to Torch and vice versa.
+
+### Translating from NIR to Torch
+NIRTorch automatically creates the Torch graph and module behind the scenes.
+The only thing you have to do as a developer is to provide a mapping between NIR nodes to PyTorch modules.
+That is, a dictionary of nodes with associated functions that produces Torch modules, given a NIR Node (`Dict[nir.NIRNode, Callable[[nir.NIRNode], torch.nn.Module]]`), where a NIR node is an element in the NIR compute graph, corresponding to neuromorphic ODEs.
+Here is one example taken from the [Norse](https://github.com/norse/norse) library:
 
 ```python
-def _extract_norse_module(module: torch.nn.Module) -> Optional[nir.NIRNode]:
-    if isinstance(module, LIFBoxCell):
-        return nir.LIF(
-            tau=module.p.tau_mem_inv,
-            v_th=module.p.v_th,
-            v_leak=module.p.v_leak,
-            r=torch.ones_like(module.p.v_leak),
-        )
-    elif isinstance(module, torch.nn.Linear):
-        return nir.Linear(module.weight, module.bias)
-    elif ...
+# Define NIR -> Norse mapping
+my_node_dictionary = {}
+def _map_linear(linear: nir.Linear) -> torch.nn.Module:
+    output_shape, input_shape = linear.weight.shape[-2:]
+    l = torch.nn.Linear(input_shape, output_shape, bias=False)
+    l.weight.data = linear.weight
+    return l
+_my_node_dictionary[nir.Linear] = _map_linear
+... # And so on for other modules
 
-    return None
-
-def to_nir(
-    module: torch.nn.Module, sample_data: torch.Tensor, model_name: str = "norse"
-) -> nir.NIRNode:
-    return extract_nir_graph(
-        module, _extract_norse_module, sample_data, model_name=model_name
+# Declare a user-facing function to output Norse modules
+def from_nir(module: nir.NIRGraph) -> torch.nn.Module:
+    return nirtorch.nir_to_torch(
+        module,              # The NIR Graph to map
+        _my_node_dictionary  # The dictionary used to map modules to Norse
     )
 ```
 
+### Translating from Torch to NIR
+NIRTorch helps construct a NIR graph by tracing through the PyTorch graph module by module.
+Our job as a developer is now to provide a mapping that helps translate PyTorch modules into NIR nodes, where a NIR node is an element in the NIR compute graph.
+That is, a `Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]`.
+Note that the output node may be a subgraph.
+
+def torch_to_nir(
+    module: torch.nn.Module,
+    module_map: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]],
+    default_dict: Optional[
+        Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]
+    ] = None,
+) -> nir.NIRGraph:
+
+```python
+# Define Norse -> NIR mapping
+_my_module_dict = {}
+def _extract_lif_module(module: norse.LIFBoxCell) -> Optional[nir.NIRNode]:
+    return nir.LIF(
+        tau=module.p.tau_mem_inv,
+        v_th=module.p.v_th,
+        v_leak=module.p.v_leak,
+        r=torch.ones_like(module.p.v_leak),
+    )
+_my_module_dict[norse.LIFBoxcell] =_extract_lif_module
+
+# Declare a user-facing function to output NIR graphs
+def to_nir(module: torch.nn.Module) -> nir.NIRNode:
+    return nirtorch.torch_to_nir(
+        module,          # The Norse/Torch module to parse
+        _my_module_dict  # The dictionary that maps Norse module to NIR
+    )
+```
+Read the full documentation at [neuroir.org/docs](https://neuroir.org/docs/dev_pytorch.html).
+
+
 ## Acknowledgements
-If you use NIR torch in your work, please cite the [following Zenodo reference](https://zenodo.org/record/8105042)
+If you use NIR torch in your work, please cite the [our work in Nature Communications](https://www.nature.com/articles/s41467-024-52259-9)
 
 ```
-@software{nir2023,
-  author       = {Abreu, Steven and
-                  Bauer, Felix and
-                  Eshraghian, Jason and
-                  Jobst, Matthias and
-                  Lenz, Gregor and
-                  Pedersen, Jens Egholm and
-                  Sheik, Sadique},
-  title        = {Neuromorphic Intermediate Representation},
-  month        = jul,
-  year         = 2023,
-  publisher    = {Zenodo},
-  version      = {0.0.1},
-  doi          = {10.5281/zenodo.8105042},
-  url          = {https://doi.org/10.5281/zenodo.8105042}
+article{NIR2024, 
+    title={Neuromorphic intermediate representation: A unified instruction set for interoperable brain-inspired computing}, 
+    author={Pedersen, Jens E. and Abreu, Steven and Jobst, Matthias and Lenz, Gregor and Fra, Vittorio and Bauer, Felix Christian and Muir, Dylan Richard and Zhou, Peng and Vogginger, Bernhard and Heckel, Kade and Urgese, Gianvito and Shankar, Sadasivan and Stewart, Terrence C. and Sheik, Sadique and Eshraghian, Jason K.}, 
+    rights={2024 The Author(s)},
+    DOI={10.1038/s41467-024-52259-9}, 
+    number={1},
+    journal={Nature Communications}, 
+    volume={15},
+    year={2024}, 
+    month=sep, 
+    pages={8122},
 }
 ```
 
