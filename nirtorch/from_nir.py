@@ -53,14 +53,10 @@ def load(
     model_map: Callable[[nir.NIRNode], nn.Module],
     return_state: bool = True,
 ) -> nn.Module:
-    """Load a NIR graph and convert it to a torch module using the given model map.
+    """
+    DEPRECATED: Use `nirtorch.torch_to_nir` instead.
 
-    Because the graph can contain recurrence and stateful modules.
-
-    >>> map = {nir.LI: lambda li: MyLIModule(li.tau, li.r, li.v_leak)}
-    >>> executor = nirtorch.load(nir_graph, model_map)
-    >>> output, state = executor(input) # Note the state return value
-    >>> output, state = executor(input, state) # This can go on for many (time)steps
+    Load a NIR graph and convert it to a torch module using the given model map.
 
     If you do not wish to operate with state, set `return_state=False`.
 

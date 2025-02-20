@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 import warnings
 
 import nir
@@ -7,15 +7,6 @@ import numpy as np
 import torch.nn as nn
 
 from .graph import extract_torch_graph
-
-
-DEFAULT_MAPS: Dict[nn.Module, Callable[[nn.Module], nir.NIRNode]] = {
-    nn.Linear: (
-        lambda module: nir.Affine(
-            module.weight.detach().numpy(), module.bias.detach().numpy()
-        )
-    )
-}
 
 
 def extract_nir_graph(
@@ -27,7 +18,10 @@ def extract_nir_graph(
     model_fwd_args=[],
     ignore_dims: Optional[Sequence[int]] = None,
 ) -> nir.NIRNode:
-    """Given a `model`, generate an NIR representation using the specified `model_map`.
+    """
+    DEPRECATED: Use `nirtorch.torch_to_nir` instead.
+
+    Given a `model`, generate an NIR representation using the specified `model_map`.
 
     Assumptions and known issues:
         - Cannot deal with layers like torch.nn.Identity(), since the input tensor and

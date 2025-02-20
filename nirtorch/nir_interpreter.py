@@ -262,7 +262,7 @@ def _construct_fx_graph(
 
 
 def nir_to_torch(
-    nir_graph: nir.NIRGraph,
+    nir_node: nir.NIRNode,
     node_map: NodeMapType,
     default_map: NodeMapType = DEFAULT_MAP,
 ) -> torch.fx.GraphModule:
@@ -271,10 +271,37 @@ def nir_to_torch(
     We first map all individual nodes using the node_map, where a common set of mappings are provided by default (e. g. Linear, Conv, etc.)
     Then, we wire all the nodes together into an executable torch.fx.GraphModule.
     Finally, we wrap the execution in a StatefulInterpreter, to ensure that the internal state of modules are handled correctly.
+
+    Example:
+    >>> # First, we describe the NIR graph
+    >>> nir_avgpool = nir.AvgPool2d(kernel_size=np.array([2, 2]), stride=np.array([1]), padding=np.array([0, 0]))
+    >>> nir_linear = nir.Linear(weight=np.ones((5, 5), dtype=np.float32))
+    >>> nir_graph = nir.NIRGraph.from_list(nir_avgpool, nir_linear) # Constructs a graph with a single node: AvgPool2d
+    >>> # Second, we define the mapping
+    >>> nir_to_torch_map = {
+    >>>     nir.AvgPool2d: lambda node: torch.nn.AvgPool2d(
+    >>>         kernel_size=tuple(torch.from_numpy(node.kernel_size)),
+    >>>         stride=torch.from_numpy(node.stride),
+    >>>         padding=tuple(torch.from_numpy(node.padding))
+    >>>     )
+    >>> }
+    >>> # Finally, we call nirtorch with the node and dictionary
+    >>> converted_module = nirtorch.nir_to_torch(nir_graph, nir_to_torch_map)
+    >>> output, state = torch_module(torch.ones(1)) # Note the state return a tuple of (value, state)
+    >>> output, state = torch_module(input, state)  # This can go on for many (time)steps
+
+    Args:
+        nir_node (nir.NIRNode): The input NIR node to convert to torch, typically a nir.NIRGraph
+        node_map (Dict[nir.NIRNode, Callable[[nir.NIRNode], torch.nn.Module]]): A dictionary that
+            maps NIR nodes into Torch modules.
+        default_map (Dict[nir.NIRNode, Callable[[nir.NIRNode], torch.nn.Module]]): A dictionary with
+            default values to use in case where `node_map` entries are missing. The default value of
+            this parameter defines mappings for simple modules like nir.Linear and nir.Input. Override
+            this to provide custom defaults.
     """
     map_with_defaults = dict(default_map)
     map_with_defaults.update(node_map)  # Overwrite defaults with node_map
     # First convert all nodes into a module dictionary
-    owning_module = _construct_module_dict_recursive(nir_graph, map_with_defaults)
+    owning_module = _construct_module_dict_recursive(nir_node, map_with_defaults)
     # Then wire the graph recursively
-    return _construct_fx_graph(owning_module=owning_module, nir_graph=nir_graph)
+    return _construct_fx_graph(owning_module=owning_module, nir_graph=nir_node)

@@ -4,7 +4,6 @@ import nir
 import numpy as np
 import torch
 
-from nirtorch.to_nir import DEFAULT_MAPS
 from nirtorch.torch_tracer import torch_to_nir
 
 
@@ -32,7 +31,7 @@ def test_trace_unknown_leaf():
 
 def test_trace_default_linear():
     model = torch.nn.Linear(1, 1)
-    graph = torch_to_nir(model, DEFAULT_MAPS)
+    graph = torch_to_nir(model, {})
     assert graph.__class__ == nir.Affine
 
 
@@ -59,7 +58,7 @@ def test_trace_mapped_module_stateless():
             return self.lin(x) + state
 
     model = MyModule()
-    graph = torch_to_nir(model, DEFAULT_MAPS)
+    graph = torch_to_nir(model, {})
     assert len(graph.nodes) == 3
     assert len(graph.edges) == 2
     assert len(_filter_edges(graph, nir.Input, nir.Affine)) == 1
@@ -77,7 +76,7 @@ def test_trace_mapped_module_stateful():
             return self.lin(x) + self.state
 
     model = MyModule()
-    graph = torch_to_nir(model, DEFAULT_MAPS)
+    graph = torch_to_nir(model, {})
     assert len(graph.nodes) == 3
     assert len(graph.edges) == 2
     assert len(_filter_edges(graph, nir.Input, nir.Affine)) == 1
@@ -94,7 +93,7 @@ def test_trace_addition():
             return self.lin(x) + self.lin(x)
 
     model = MyModule()
-    graph = torch_to_nir(model, DEFAULT_MAPS)
+    graph = torch_to_nir(model, {})
     assert len(graph.nodes) == 4
     assert len(graph.edges) == 4
     assert len(_filter_edges(graph, nir.Input, nir.Affine)) == 2
@@ -103,7 +102,7 @@ def test_trace_addition():
 
 def test_trace_sequential():
     model = torch.nn.Sequential(torch.nn.Linear(2, 1), torch.nn.Linear(1, 1))
-    graph = torch_to_nir(model, DEFAULT_MAPS)
+    graph = torch_to_nir(model, {})
     assert graph.__class__ == nir.NIRGraph
     assert len(graph.nodes) == 4
     assert len(graph.edges) == 3
@@ -127,7 +126,7 @@ def test_trace_submodule():
             return self.linear(x)
 
     model = MyModule()
-    graph = torch_to_nir(model, DEFAULT_MAPS)
+    graph = torch_to_nir(model, {})
     assert graph.__class__ == nir.NIRGraph
     assert len(graph.nodes) == 3
     assert len(graph.edges) == 2
@@ -159,7 +158,7 @@ def test_trace_nested_submodule():
             return self.linear(self.module(x))
 
     model = MyModule2()
-    graph = torch_to_nir(model, DEFAULT_MAPS)
+    graph = torch_to_nir(model, {})
     assert graph.__class__ == nir.NIRGraph
     assert len(graph.nodes) == 4
     assert len(graph.edges) == 3
@@ -186,5 +185,5 @@ def test_recursive_stateful():
             return out
 
     model = MyModule()
-    graph = torch_to_nir(model, DEFAULT_MAPS)
+    graph = torch_to_nir(model, {})
     assert graph.__class__ == nir.NIRGraph
