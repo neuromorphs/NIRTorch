@@ -1,10 +1,21 @@
-from typing import Any, Callable, Dict, Set, Tuple, Optional
+from typing import Any, Callable, Dict, Set, Tuple
 import operator
 
 import numpy as np
 
 import nir
 import torch
+
+
+DEFAULT_MAP: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]] = {
+    torch.nn.Linear: (
+        lambda module: nir.Affine(
+            module.weight.detach().numpy(), module.bias.detach().numpy()
+        )
+    )
+    # TODO: Add more default nodes
+    # https://github.com/neuromorphs/NIRTorch/issues/25
+}
 
 
 class NIRTorchTracer(torch.fx.Tracer):
@@ -60,20 +71,34 @@ class NIRTorchTransformer(torch.fx.Transformer):
 def torch_to_nir(
     module: torch.nn.Module,
     module_map: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]],
-    default_dict: Optional[
-        Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]
-    ] = None,
+    default_dict: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]] = DEFAULT_MAP,
 ) -> nir.NIRGraph:
     """
     Traces a PyTorch module and converts it to a NIR graph using the specified module map.
+
+    >>> import nir, nirtorch, numpy as np, torch
+    >>> # First, we describe the PyTorch module we want to convert
+    >>> torch_module = torch.nn.AvgPool2d(kernel_size=(2, 2), stride=0, padding=1)
+    >>> # Second, we define the dictionary
+    >>> torch_to_nir_map = {
+    >>>     torch.nn.AvgPool2d: lambda module: nir.AvgPool2d(
+    >>>         kernel_size=np.array(module.kernel_size),
+    >>>         stride=np.array(module.stride),
+    >>>         padding=np.array(module.padding)
+    >>>     )
+    >>> }
+    >>> # Finally, we call nirtorch with the node and dictionary
+    >>> torch_module = nirtorch.torch_to_nir(torch_module, torch_to_nir_map)
+    >>> output, state = torch_module(input)        # Note the module returns a tuple of (output, state)
+    >>> output, state = torch_module(input, state) # This can go on for many (time)steps
 
     Args:
         module (torch.nn.Module): The module of interest
         module_map (Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]): A dictionary that maps
             a given module type to a function that can convert the model to an NIRNode type
-        default_dict (Optional[Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]]): An optional dictionary that maps
-            a given module type to a function that can convert the model to an NIRNode type. This dictionary is merged
-            with the module_map dictionary.
+        default_dict (Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]): An dictionary
+            of default mappings that, by default, maps trivial modules like torch.nn.Linear. Override
+            the dictionary to provide custom mappings.
     """
     # Merge the default dictionary, if it exists
     if default_dict is not None:
