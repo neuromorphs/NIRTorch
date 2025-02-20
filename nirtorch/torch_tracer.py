@@ -71,9 +71,7 @@ class NIRTorchTransformer(torch.fx.Transformer):
 def torch_to_nir(
     module: torch.nn.Module,
     module_map: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]],
-    default_dict: Optional[
-        Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]
-    ] = DEFAULT_MAP,
+    default_dict: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]] = DEFAULT_MAP,
 ) -> nir.NIRGraph:
     """
     Traces a PyTorch module and converts it to a NIR graph using the specified module map.
