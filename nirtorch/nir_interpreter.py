@@ -1,4 +1,5 @@
 import collections
+import keyword
 import typing
 
 import nir
@@ -68,6 +69,14 @@ DEFAULT_MAP: NodeMapType = {
 }
 
 
+def _sanitize_name(name: str) -> str:
+    """Sanitize module name to ensure torch.fx doesn't write any keywords in code"""
+    if keyword.iskeyword(name):
+        return "nir_node_" + name
+    else:
+        return name
+
+
 def _map_nir_node_to_torch(
     node: nir.NIRNode, node_map: NodeMapType
 ) -> typing.Optional[torch.nn.Module]:
@@ -86,11 +95,13 @@ def _construct_module_dict_recursive(
     for name, node in nir_graph.nodes.items():
         # Recurse into subgraphs
         if isinstance(node, nir.NIRGraph):
-            owning_module[name] = _construct_module_dict_recursive(node, node_map)
+            owning_module[_sanitize_name(name)] = _construct_module_dict_recursive(
+                node, node_map
+            )
         else:
             mapped_module = _map_nir_node_to_torch(node, node_map=node_map)
             if mapped_module is not None:
-                owning_module[name] = mapped_module
+                owning_module[_sanitize_name(name)] = mapped_module
     return owning_module
 
 
@@ -138,6 +149,9 @@ def _construct_fx_graph(
 ) -> torch.fx.GraphModule:
     node_outputs = {}
     recursion_counter = collections.Counter(nir_graph.nodes.keys())
+    sanitized_edges = [
+        (_sanitize_name(a), _sanitize_name(b)) for a, b in nir_graph.edges
+    ]
     # The maximum iterations per node (see https://github.com/neuromorphs/NIRTorch/pull/28#discussion_r1959343951)
     max_iterations = min(3, len(recursion_counter))
     torch_graph = torch.fx.Graph(owning_module)
@@ -151,6 +165,10 @@ def _construct_fx_graph(
     # Loop through all the nodes in the queue
     while module_queue:
         module_name, module = module_queue.popleft()
+        # Sanitize the module name to avoid writing keywords in the generated Python code
+        module_name = _sanitize_name(module_name)
+
+        # Test for number of recursions
         if recursion_counter[module_name] > max_iterations:
             raise RecursionError(
                 f"Module {module_name} has been traversed multiple times"
@@ -185,7 +203,7 @@ def _construct_fx_graph(
                 for input_name, output in module.input_type.items():
                     # First fetch the required input nodes
                     module_input_nodes = _find_input_nodes(
-                        module_name, edges=nir_graph.edges, node_outputs=node_outputs
+                        module_name, edges=sanitized_edges, node_outputs=node_outputs
                     )
                     # If the module uses input that is not yet defined, set the inputs to some dummy value
                     # and enqueue the module again for processing (where it's hopefully defined)
@@ -239,7 +257,7 @@ def _construct_fx_graph(
                     # Add the raw output to the graph
                     node_outputs[f"{module_name}_raw"] = output
                     # Add the module state to the graph for use as the input to the next module
-                    node_outputs[f"{module_name}"] = torch_graph.call_method(
+                    node_outputs[module_name] = torch_graph.call_method(
                         "__getitem__", (output, 0)
                     )
                     # Add the state to the state dictionary
@@ -273,6 +291,7 @@ def nir_to_torch(
     Finally, we wrap the execution in a StatefulInterpreter, to ensure that the internal state of modules are handled correctly.
 
     Example:
+
     >>> # First, we describe the NIR graph
     >>> nir_avgpool = nir.AvgPool2d(kernel_size=np.array([2, 2]), stride=np.array([1]), padding=np.array([0, 0]))
     >>> nir_linear = nir.Linear(weight=np.ones((5, 5), dtype=np.float32))

@@ -115,6 +115,35 @@ def test_map_conv2d_node():
     assert torch_conv(torch.ones(1, 3, 10, 11)).shape == (1, 2, 5, 3)
 
 
+def test_map_if_node():
+    # Generating code with the "if" keyword can be sensitive
+    # This tests ensures that it works properly
+    v_th = np.random.random(1)
+    r = np.random.random(1)
+    nir_node = nir.IF(r=r, v_threshold=v_th)
+
+    class MyIF(torch.nn.Module):
+        def __init__(self, r, v_th):
+            super().__init__()
+            self.r = r
+            self.v_th = v_th
+
+        def forward(self, x, state):
+            return x * self.r - self.v_th, state
+
+    node_map = {
+        nir.IF: lambda node: MyIF(
+            torch.from_numpy(node.r), torch.from_numpy(node.v_threshold)
+        )
+    }
+    torch_if = nir_interpreter._map_nir_node_to_torch(nir_node, node_map)
+    data = torch.rand(1)
+    assert torch.allclose(data * r - v_th, torch_if(data, None)[0])
+
+    torch_if = nir_interpreter.nir_to_torch(nir.NIRGraph.from_list(nir_node), node_map)
+    assert isinstance(torch_if.get_submodule("nir_node_if"), MyIF)
+
+
 def test_map_leaky_stateful_graph_single_module():
     # Test that the graph can handle a single stateful module
     tau = np.random.random(1)
