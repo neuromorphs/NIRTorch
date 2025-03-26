@@ -144,6 +144,13 @@ def test_map_if_node():
     assert isinstance(torch_if.get_submodule("nir_node_if"), MyIF)
 
 
+def test_map_single_node():
+    w = np.random.random((2, 2))
+    node = nir.Linear(w)
+    torch_linear = nir_interpreter.nir_to_torch(node, {})
+    assert torch.allclose(torch_linear.weight, torch.from_numpy(w))
+
+
 def test_map_leaky_stateful_graph_single_module():
     # Test that the graph can handle a single stateful module
     tau = np.random.random(1)

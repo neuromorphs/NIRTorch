@@ -1,6 +1,7 @@
 import collections
 import keyword
 import typing
+import pathlib
 
 import nir
 import torch
@@ -280,7 +281,7 @@ def _construct_fx_graph(
 
 
 def nir_to_torch(
-    nir_node: nir.NIRNode,
+    nir_node: typing.Union[str, nir.NIRNode],
     node_map: NodeMapType,
     default_map: NodeMapType = DEFAULT_MAP,
 ) -> torch.fx.GraphModule:
@@ -292,7 +293,12 @@ def nir_to_torch(
 
     Example:
 
-    >>> # First, we describe the NIR graph
+    >>> # Using an existing graph
+    >>> nir_graph = ...
+    >>> torch_module = nirtorch.nir_to_torch(nir_graph)
+    >>> torch.module(torch.randn(...)) # The module is now ready to use
+
+    >>> # Using a custom graph
     >>> nir_avgpool = nir.AvgPool2d(kernel_size=np.array([2, 2]), stride=np.array([1]), padding=np.array([0, 0]))
     >>> nir_linear = nir.Linear(weight=np.ones((5, 5), dtype=np.float32))
     >>> nir_graph = nir.NIRGraph.from_list(nir_avgpool, nir_linear) # Constructs a graph with a single node: AvgPool2d
@@ -310,7 +316,8 @@ def nir_to_torch(
     >>> output, state = torch_module(input, state)  # This can go on for many (time)steps
 
     Args:
-        nir_node (nir.NIRNode): The input NIR node to convert to torch, typically a nir.NIRGraph
+        nir_node (Union[nir.NIRNode, str, pathlib.Path]): The input NIR node to convert to torch, typically a nir.NIRGraph.
+            Can also be a string or a path, in which case, we use `nir.read` to fetch the graph from the file first.
         node_map (Dict[nir.NIRNode, Callable[[nir.NIRNode], torch.nn.Module]]): A dictionary that
             maps NIR nodes into Torch modules.
         default_map (Dict[nir.NIRNode, Callable[[nir.NIRNode], torch.nn.Module]]): A dictionary with
@@ -318,9 +325,18 @@ def nir_to_torch(
             this parameter defines mappings for simple modules like nir.Linear and nir.Input. Override
             this to provide custom defaults.
     """
+    if isinstance(nir_node, str) or isinstance(nir_node, pathlib.Path):
+        nir_node = nir.read(nir_node)
     map_with_defaults = dict(default_map)
     map_with_defaults.update(node_map)  # Overwrite defaults with node_map
-    # First convert all nodes into a module dictionary
+
+    # If the node is a leaf node (not a graph), we only mad that single node
+    if not isinstance(nir_node, nir.NIRGraph):
+        mapped_node = _map_nir_node_to_torch(nir_node, map_with_defaults)
+        return mapped_node
+
+    # If the node is a graph, we map it recursively
+    # - First convert all nodes into a module dictionary
     owning_module = _construct_module_dict_recursive(nir_node, map_with_defaults)
-    # Then wire the graph recursively
+    # - Then wire the graph recursively
     return _construct_fx_graph(owning_module=owning_module, nir_graph=nir_node)
