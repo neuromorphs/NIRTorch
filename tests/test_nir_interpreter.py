@@ -305,3 +305,8 @@ def test_import_lif_new_api():
     g = nir.read("tests/lif_norse.nir")
     m = nir_interpreter.nir_to_torch(g, _torch_node_map)
     assert m(torch.empty(1))[0].shape == (1,)
+
+
+def test_import_lif_new_api_string():
+    m = nir_interpreter.nir_to_torch("tests/lif_norse.nir", _torch_node_map)
+    assert m(torch.empty(1))[0].shape == (1,)
