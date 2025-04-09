@@ -126,8 +126,9 @@ def _find_input_nodes(
     for src, target in input_node_names:
         # Add the special case where a module input is its own output
         if src == name and target == name:
+            dummy_state = torch_graph.call_function(torch.zeros, (1,))
             prev_output_node = torch_graph.call_method(
-                "__getitem__", (state_node, f"{name}_prev_output")
+                "get", (state_node, f"{name}_prev_output", dummy_state)
             )
             output_nodes.append(prev_output_node)
         else:
@@ -278,21 +279,6 @@ def _construct_fx_graph(
             # 3. Handle state
             kwargs = {}
             is_stateful = _is_stateful(owning_module[module_name])
-            
-            # - For recursive modules, we need to retrieve the previous output from state
-            if is_recursive:                
-                # Add a specific state entry for storing previous output
-                prev_output_key = f"{module_name}_prev_output"
-                
-                # If this is the first time processing this module, initialize the previous output state
-                if module_name not in visited_nodes:
-                    # Initialize with a dummy value in state
-                    dummy_state = torch_graph.call_function(torch.zeros, (1,))
-                    torch_graph.call_method(
-                        "__setitem__", (state_argument, prev_output_key, dummy_state)
-                    )
-            
-            # Get state if needed
             if is_stateful:
                 kwargs["state"] = torch_graph.call_method(
                     "__getitem__", (state_argument, module_name)
