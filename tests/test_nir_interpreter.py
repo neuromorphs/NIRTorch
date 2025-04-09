@@ -270,10 +270,8 @@ def test_map_out_of_order():
     assert torch.allclose(module(data)[0], torch.from_numpy(w) @ data)
 
 
-# TODO: Implement recursive calls
-@pytest.mark.skip("Recursion is not implemented yet")
 def test_map_recursive_graph():
-    w = np.random.random((2, 3)).astype(np.float32)
+    w = np.random.random((3, 2)).astype(np.float32)
     nodes = {
         "linear": nir.Linear(w),
         "input": nir.Input(np.array([2])),
@@ -282,8 +280,8 @@ def test_map_recursive_graph():
     edges = [("linear", "linear"), ("input", "linear"), ("linear", "output")]
     graph = nir.NIRGraph(nodes, edges)
     module = nir_interpreter.nir_to_torch(graph, {nir.Linear: _map_linear_node})
-    data = torch.rand(2)
-    assert torch.allclose(module(data), data @ torch.from_numpy(w))
+    data = torch.rand(2) 
+    assert torch.allclose(module(data)[0], data @ torch.from_numpy(w).T)
 
 
 ##########################################
