@@ -273,8 +273,8 @@ def test_map_out_of_order():
 def test_map_recursive_graph():
     w = np.random.random((2, 2)).astype(np.float32)
     nodes = {
-        "linear": nir.Linear(w),
         "input": nir.Input(np.array([2])),
+        "linear": nir.Linear(w),
         "output": nir.Output(np.array([2])),
     }
     edges = [("linear", "linear"), ("input", "linear"), ("linear", "output")]
@@ -284,9 +284,74 @@ def test_map_recursive_graph():
     expected = data @ torch.from_numpy(w).T
     actual, state = module(data)
     assert torch.allclose(actual, expected)
+    assert "linear_prev_output" in state
     actual2, _ = module(data, state)
     assert torch.allclose(actual2, (expected + data) @ torch.from_numpy(w).T)
 
+
+def test_map_recursive_graph_two_nodes():
+    w = np.random.random((2, 2)).astype(np.float32)
+    nodes = {
+        "input": nir.Input(np.array([2])),
+        "linear1": nir.Linear(w),
+        "linear2": nir.Linear(w),
+        "output": nir.Output(np.array([2])),
+    }
+    edges = [("linear1", "linear2"), ("linear2", "linear1"), ("input", "linear1"), ("linear2", "output")]
+    graph = nir.NIRGraph(nodes, edges)
+    module = nir_interpreter.nir_to_torch(graph, {nir.Linear: _map_linear_node})
+    lin_module = torch.nn.Linear(2, 2, bias=False)
+    lin_module.weight.data = torch.from_numpy(w)
+    data = torch.rand(2)
+    expected = lin_module(lin_module(data))
+    actual, state = module(data)
+    assert torch.allclose(actual, expected)
+    assert torch.allclose(state["linear2_prev_output"], expected)
+    actual2, _ = module(data, state)
+    assert torch.allclose(actual2, lin_module(lin_module((expected + data))))
+
+def test_find_recursive_inputs_multiple():
+    node = "A"
+    edges = set([("A", "B"), ("B", "C"), ("B", "A"), ("C", "A")])
+    actual = nir_interpreter._find_recursive_inputs(node, edges)
+    assert actual == set(["B", "C"])
+
+def test_map_recursive_graph_multiple_nodes():
+    w = np.random.random((2, 2)).astype(np.float32)
+    nodes = {
+        "input": nir.Input(np.array([2])),
+        "linear1": nir.Linear(w),
+        "linear2": nir.Linear(w),
+        "linear3": nir.Linear(w),
+        "output": nir.Output(np.array([2])),
+    }
+    edges = [("linear1", "linear2"), ("linear2", "linear1"), ("linear2", "linear3"), ("linear3", "linear3"),
+             ("linear3", "linear1"), ("input", "linear1"), ("linear2", "output")]
+    """
+    In -> 1 -> 2 -> Out
+          ^---/ \---> 3 --\
+          ^----------/ ^--/   
+    """
+    graph = nir.NIRGraph(nodes, edges)
+    module = nir_interpreter.nir_to_torch(graph, {nir.Linear: _map_linear_node})
+    lin_module = torch.nn.Linear(2, 2, bias=False)
+    lin_module.weight.data = torch.from_numpy(w)
+    data = torch.rand(2)
+    expected = lin_module(lin_module(data))
+    actual, state = module(data)
+    assert torch.allclose(actual, expected)
+    old_lin2_state = state["linear2_prev_output"]
+    old_lin3_state = state["linear3_prev_output"]
+    # Test that the states for lin2 and lin3 are set
+    assert torch.allclose(old_lin2_state, expected)
+    assert torch.allclose(old_lin3_state, lin_module(expected))
+    actual2, _ = module(data, state)
+    # Note: The state dictionary has now been updated!
+    # Linear 3 uses its own old state and the new input from linear2
+    assert torch.allclose(state["linear3_prev_output"], lin_module(old_lin3_state + state["linear2_prev_output"]))
+    # Test the output from linear 2 = linearity(lin3_state + linearity(lin3_state + data))
+    lin_output = lin_module(old_lin3_state + lin_module(old_lin3_state + data))
+    assert torch.allclose(actual2, lin_output)
 
 ##########################################
 #### Integration tests
