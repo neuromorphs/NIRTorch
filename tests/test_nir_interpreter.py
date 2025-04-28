@@ -64,6 +64,23 @@ def test_map_fails_on_unknown():
         nir_interpreter.nir_to_torch(graph, {}, {})
 
 
+def test_map_nodes_with_periods_in_name():
+    w = np.ones((2, 2))
+    linear = nir.Linear(w)
+    graph = nir.NIRGraph(
+        nodes={
+            "some.name": linear,
+            "i": nir.Input(np.array([2])),
+            "o": nir.Output(np.array([2])),
+        },
+        edges=[("i", "some.name"), ("some.name", "o")],
+    )
+    mapped = nir_interpreter.nir_to_torch(graph, {})
+    named_children = list(mapped.named_children())
+    assert len(named_children) == 1
+    assert named_children[0][0] == "some_name"
+
+
 def test_map_linear_node():
     w = np.random.random((2, 3)).astype(np.float32)
     linear = nir.Linear(w)
@@ -149,6 +166,14 @@ def test_map_single_node():
     node = nir.Linear(w)
     torch_linear = nir_interpreter.nir_to_torch(node, {})
     assert torch.allclose(torch_linear.weight, torch.from_numpy(w))
+
+
+def test_fails_on_graphs_without_input_output():
+    w = np.ones((2, 2))
+    linear = nir.Linear(w)
+    graph = nir.NIRGraph(nodes={"lin": linear}, edges=[])
+    with pytest.raises(ValueError):
+        nir_interpreter.nir_to_torch(graph, {})
 
 
 def test_map_leaky_stateful_graph_single_module():
@@ -280,7 +305,7 @@ def test_map_recursive_graph():
     edges = [("linear", "linear"), ("input", "linear"), ("linear", "output")]
     graph = nir.NIRGraph(nodes, edges)
     module = nir_interpreter.nir_to_torch(graph, {nir.Linear: _map_linear_node})
-    data = torch.rand(2) 
+    data = torch.rand(2)
     expected = data @ torch.from_numpy(w).T
     actual, state = module(data)
     assert torch.allclose(actual, expected)
@@ -297,7 +322,12 @@ def test_map_recursive_graph_two_nodes():
         "linear2": nir.Linear(w),
         "output": nir.Output(np.array([2])),
     }
-    edges = [("linear1", "linear2"), ("linear2", "linear1"), ("input", "linear1"), ("linear2", "output")]
+    edges = [
+        ("linear1", "linear2"),
+        ("linear2", "linear1"),
+        ("input", "linear1"),
+        ("linear2", "output"),
+    ]
     graph = nir.NIRGraph(nodes, edges)
     module = nir_interpreter.nir_to_torch(graph, {nir.Linear: _map_linear_node})
     lin_module = torch.nn.Linear(2, 2, bias=False)
@@ -310,11 +340,13 @@ def test_map_recursive_graph_two_nodes():
     actual2, _ = module(data, state)
     assert torch.allclose(actual2, lin_module(lin_module((expected + data))))
 
+
 def test_find_recursive_inputs_multiple():
     node = "A"
     edges = set([("A", "B"), ("B", "C"), ("B", "A"), ("C", "A")])
     actual = nir_interpreter._find_recursive_inputs(node, edges)
     assert actual == set(["B", "C"])
+
 
 def test_map_recursive_graph_multiple_nodes():
     w = np.random.random((2, 2)).astype(np.float32)
@@ -325,8 +357,15 @@ def test_map_recursive_graph_multiple_nodes():
         "linear3": nir.Linear(w),
         "output": nir.Output(np.array([2])),
     }
-    edges = [("linear1", "linear2"), ("linear2", "linear1"), ("linear2", "linear3"), ("linear3", "linear3"),
-             ("linear3", "linear1"), ("input", "linear1"), ("linear2", "output")]
+    edges = [
+        ("linear1", "linear2"),
+        ("linear2", "linear1"),
+        ("linear2", "linear3"),
+        ("linear3", "linear3"),
+        ("linear3", "linear1"),
+        ("input", "linear1"),
+        ("linear2", "output"),
+    ]
     """
     In -> 1 -> 2 -> Out
           ^---/ \---> 3 --\
@@ -348,10 +387,14 @@ def test_map_recursive_graph_multiple_nodes():
     actual2, _ = module(data, state)
     # Note: The state dictionary has now been updated!
     # Linear 3 uses its own old state and the new input from linear2
-    assert torch.allclose(state["linear3_prev_output"], lin_module(old_lin3_state + state["linear2_prev_output"]))
+    assert torch.allclose(
+        state["linear3_prev_output"],
+        lin_module(old_lin3_state + state["linear2_prev_output"]),
+    )
     # Test the output from linear 2 = linearity(lin3_state + linearity(lin3_state + data))
     lin_output = lin_module(old_lin3_state + lin_module(old_lin3_state + data))
     assert torch.allclose(actual2, lin_output)
+
 
 ##########################################
 #### Integration tests

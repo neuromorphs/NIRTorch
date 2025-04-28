@@ -72,7 +72,11 @@ DEFAULT_MAP: NodeMapType = {
 
 def _sanitize_name(name: str) -> str:
     """Sanitize module name to ensure torch.fx doesn't write any keywords in code
-    such as "if", "else", "for", etc."""
+    such as "if", "else", "for", etc.
+    We also replace any periods (.) with underscores (_) in the names, since PyTorch does not allow that.
+    """
+
+    name = name.replace(".", "_")
     if keyword.iskeyword(name):
         return "nir_node_" + name
     else:
@@ -121,24 +125,28 @@ def _construct_module_dict_recursive(
                 owning_module[_sanitize_name(name)] = mapped_module
     return owning_module
 
-def _can_reach(start: str, end: str, edges: typing.List[typing.Tuple[str, str]]) -> bool:
+
+def _can_reach(
+    start: str, end: str, edges: typing.List[typing.Tuple[str, str]]
+) -> bool:
     """Helper function to determine if there's a path from start to end in the graph."""
     visited = set()
     queue = [start]
-    
+
     while queue:
         current = queue.pop(0)
         if current == end:
             return True
-        
+
         if current in visited:
             continue
-        
+
         visited.add(current)
         neighbors = [e for s, e in edges if s == current]
         queue.extend(neighbors)
-    
+
     return False
+
 
 def _find_recursive_inputs(node: str, edges: typing.Set[typing.Tuple[str, str]]):
     """Locates one or more inputs to the node from *future* nodes.
@@ -148,11 +156,11 @@ def _find_recursive_inputs(node: str, edges: typing.Set[typing.Tuple[str, str]])
     Example:
         # A is self-recursive
         A ----+----> B
-        \--<--/
+        \\--<--/
 
         # A needs the output of B as input
         A --> B
-        \--<--/
+        \\--<--/
 
     Returns:
         A set of nodes whose output this node requires as input.
@@ -161,17 +169,17 @@ def _find_recursive_inputs(node: str, edges: typing.Set[typing.Tuple[str, str]])
 
     # Find all nodes that our target node outputs to
     outputs = set(end for start, end in edges if start == node)
-    
+
     # Find all nodes that provide input to our target node
     inputs = set(start for start, end in edges if end == node)
-    
+
     # Iterate over all the nodes that provide input to this module
     for other_node in inputs:
         # Check if there's a path from the other node back to our node
         # (meaning our node requires its output as input)
         if other_node in outputs or _can_reach(other_node, node, edges):
             recursive_inputs.add(other_node)
-    
+
     return recursive_inputs
 
 
@@ -180,12 +188,12 @@ def _find_input_nodes(
     edges: typing.List[typing.Tuple[str, str]],
     node_outputs: typing.Dict[str, torch.fx.Node],
     torch_graph: typing.Optional[torch.fx.Graph] = None,
-    state_node: typing.Optional[torch.fx.Node] = None
+    state_node: typing.Optional[torch.fx.Node] = None,
 ) -> typing.Tuple[typing.Set[str], bool]:
     """
     Looks through the edges and find nodes that are connected to the given node as inputs.
     If one of the inputs doesn't exist because it hasn't been defined, we return None.
-    
+
     If torch_graph is provided, multiple tensor inputs will be summed together into a single node,
     while preserving any state inputs. If it is not provided (such as for the nir.Input node),
     they are not summed together. Which may be problematic because NIR nodes typically only accept
@@ -196,7 +204,7 @@ def _find_input_nodes(
     Returns:
         The set of torch.fx nodes that yields input to the given node
     """
-    
+
     input_names = set(filter(lambda t: t[1] == name, edges))
     input_names_recursive = _find_recursive_inputs(name, edges)
 
@@ -205,7 +213,7 @@ def _find_input_nodes(
         # The node whose output we need as input
         input_node = node_outputs.get(src, None)
         needs_recursive_input = src in input_names_recursive and len(input_names) > 1
-        # If the node is None and recursive, 
+        # If the node is None and recursive,
         if input_node is None and needs_recursive_input:
             dummy_state = torch_graph.call_function(torch.zeros, (1,))
             prev_output_node = torch_graph.call_method(
@@ -215,23 +223,32 @@ def _find_input_nodes(
         # If the input is not recursive, add it as usual
         else:
             output_nodes.append(input_node)
-    
+
     # If we have torch_graph and multiple valid inputs, sum them
-    if torch_graph is not None and len(output_nodes) > 1 and not any(node is None for node in output_nodes):
+    if (
+        torch_graph is not None
+        and len(output_nodes) > 1
+        and not any(node is None for node in output_nodes)
+    ):
         # Create a sum node in the graph
-        sum_node = torch_graph.call_function(torch.add, (output_nodes[0], output_nodes[1]))
+        sum_node = torch_graph.call_function(
+            torch.add, (output_nodes[0], output_nodes[1])
+        )
         # Add each remaining node to the sum
         for node in output_nodes[2:]:
             sum_node = torch_graph.call_function(torch.add, (sum_node, node))
         return (sum_node,)  # Return as a single-element tuple for consistency
-    
+
     return tuple(output_nodes)
 
 
 def _is_stateful(module: torch.nn.Module) -> bool:
     """Determines whether a PyTorch module requires a state input value.
-    This is the case for canonical PyTorch RNN modules, where the second value 
+    This is the case for canonical PyTorch RNN modules, where the second value
     typically represents a recurring state.
+
+    Arguments:
+        module (torch.nn.Module): The module to study.
 
     Returns:
         True if the method signature contains "state", if the module is a subclass
@@ -276,12 +293,12 @@ def _construct_fx_graph(
     We use a queue (collections.deque) in case we encounter recursive connections. In that case,
     we have to trace the output of previous nodes. But, since the previous node is not defined yet,
     we enqueue the current node in the hope that it'll be defined next time around.
-    
+
     The function _find_input_nodes finds all the nodes that provide inputs to a given node.
     And _find_recursive_inputs help figure out which of the input nodes are using input from "future"
     nodes in the graph, that is, nodes that uses the output of the current nodes as input. If such
-    a node is discovered, we prepare a state variable. Initially, that state variable is zero, but 
-    it's later updated if the module is called (we know to set the state variable because the module 
+    a node is discovered, we prepare a state variable. Initially, that state variable is zero, but
+    it's later updated if the module is called (we know to set the state variable because the module
     is flagged as recursive).
 
     Arguments:
@@ -289,6 +306,20 @@ def _construct_fx_graph(
         nir_graph (nir.NIRGraph): The NIRGraph to trace. Mainly used for connectivity (edges) at this point, since
             the modules have already been converted.
     """
+    # Ensure that the graph has input and output nodes
+    has_input = any(isinstance(node, nir.Input) for node in nir_graph.nodes.values())
+    has_output = any(isinstance(node, nir.Output) for node in nir_graph.nodes.values())
+    if not (has_input and has_output):
+        if not has_input and not has_output:
+            message = "neither input nor output was found"
+        elif not has_input:
+            message = "no input node was found"
+        else:  # not has_output
+            message = "no output node was found"
+        raise ValueError(
+            f"NIR graphs must contain input and output nodes, but {message}"
+        )
+
     node_outputs = {}
     visited_nodes = set()
     pending_nodes = set()
@@ -297,6 +328,7 @@ def _construct_fx_graph(
         (_sanitize_name(a), _sanitize_name(b)) for a, b in nir_graph.edges
     ]
     torch_graph = torch.fx.Graph(owning_module)
+
     # Create a queue of the modules where we can re-insert modules for re-processing
     # in case of self-reference or if the graph is given out of order
     module_queue = collections.deque(nir_graph.nodes.items())
@@ -322,7 +354,9 @@ def _construct_fx_graph(
 
         if isinstance(module, nir.Input):
             if len(module.output_type) > 1:
-                raise NotImplementedError("Multiple inputs to a graph are currently not supported")
+                raise NotImplementedError(
+                    "Multiple inputs to a graph are currently not supported"
+                )
             for input_name, _ in module.input_type.items():
                 node_outputs[module_name] = torch_graph.create_node(
                     "placeholder", input_name
@@ -363,15 +397,17 @@ def _construct_fx_graph(
                         )
 
                         # If the module has not been visited before, flag it
-                        if not (module_name in visited_nodes and module_name in node_outputs):
+                        if not (
+                            module_name in visited_nodes and module_name in node_outputs
+                        ):
                             visited_nodes.add(module_name)
         else:
 
-            # Else, we know that this is a regular node which means we have to 
-            # (1) check for sub-graphs, (2) deal with recursive calls, 
+            # Else, we know that this is a regular node which means we have to
+            # (1) check for sub-graphs, (2) deal with recursive calls,
             # (3) handle module state, (4) gather module inputs, (5) add the node to the graph, and
             # (6) handle output and state
-            
+
             # 1. Recursively wire subgraphs
             if isinstance(module, nir.NIRGraph):
                 owning_module[module_name] = _construct_fx_graph(
@@ -381,11 +417,15 @@ def _construct_fx_graph(
             # 2. Determine if this is a recursive module
             has_recursive_inputs = _find_recursive_inputs(module_name, nir_graph.edges)
             is_self_recursive = any(
-                src == module_name and target == module_name 
+                src == module_name and target == module_name
                 for src, target in sanitized_edges
             )
-            is_recursive = module_name in recursive_modules or has_recursive_inputs or is_self_recursive
-            
+            is_recursive = (
+                module_name in recursive_modules
+                or has_recursive_inputs
+                or is_self_recursive
+            )
+
             if is_recursive and module_name not in recursive_modules:
                 recursive_modules.add(module_name)
 
@@ -396,13 +436,15 @@ def _construct_fx_graph(
                 kwargs["state"] = torch_graph.call_method(
                     "__getitem__", (state_argument, module_name)
                 )
-            
+
             # 4. Gather inputs
             # - The call automatically sums additional inputs (while excluding any state argument)
             module_input_nodes = _find_input_nodes(
-                module_name, sanitized_edges, node_outputs=node_outputs,
+                module_name,
+                sanitized_edges,
+                node_outputs=node_outputs,
                 torch_graph=torch_graph,
-                state_node=state_argument
+                state_node=state_argument,
             )
 
             # - Handle missing inputs
@@ -410,13 +452,15 @@ def _construct_fx_graph(
                 if is_recursive:
                     # Use available inputs where possible, dummy inputs where needed
                     module_input_nodes = tuple(
-                        node if node is not None else dummy_input 
+                        node if node is not None else dummy_input
                         for node in module_input_nodes
                     )
                 else:
                     # This module depends on another module that hasn't yet been constructed
                     # Enqueue for later processing
-                    module_input_nodes = tuple([dummy_input for _ in module_input_nodes])
+                    module_input_nodes = tuple(
+                        [dummy_input for _ in module_input_nodes]
+                    )
                     module_queue.append((module_name, module))
                     continue
 
@@ -436,27 +480,28 @@ def _construct_fx_graph(
             if is_stateful:
                 # Add the raw output to the graph
                 node_outputs[f"{module_name}_raw"] = output
-                
+
                 # Separate output and state
                 node_outputs[module_name] = torch_graph.call_method(
                     "__getitem__", (output, 0)
                 )
-                
+
                 # Update state
                 state_node = torch_graph.call_method("__getitem__", (output, 1))
                 torch_graph.call_method(
                     "__setitem__", (state_argument, module_name, state_node)
                 )
-                
+
                 # For recursive modules, store current output for next iteration
                 if is_recursive:
                     prev_output_key = f"{module_name}_prev_output"
                     torch_graph.call_method(
-                        "__setitem__", (state_argument, prev_output_key, node_outputs[module_name])
+                        "__setitem__",
+                        (state_argument, prev_output_key, node_outputs[module_name]),
                     )
             else:
                 node_outputs[module_name] = output
-                
+
                 # For recursive modules without explicit state, store output in state anyway
                 if is_recursive:
                     prev_output_key = f"{module_name}_prev_output"
