@@ -84,18 +84,10 @@ def test_map_nodes_with_periods_in_name():
 def test_map_avg_pool_2d():
     pool = nir.AvgPool2d(2, 1, (1, 2))
     torch_pool = nir_interpreter.nir_to_torch(pool, {})
+    assert isinstance(torch_pool, torch.nn.AvgPool2d)
     assert torch_pool.kernel_size == 2
     assert torch_pool.stride == 1
     assert torch_pool.padding == (1, 2)
-
-
-def test_map_linear_node():
-    w = np.random.random((2, 3)).astype(np.float32)
-    linear = nir.Linear(w)
-    module = nir_interpreter._map_nir_node_to_torch(linear, nir_interpreter.DEFAULT_MAP)
-    assert torch.allclose(module.weight, torch.from_numpy(w))
-    out = module(torch.ones(3))
-    assert out.shape == (2,)
 
 
 def test_map_conv1d_node():
@@ -169,6 +161,21 @@ def test_map_if_node():
     assert isinstance(torch_if.get_submodule("nir_node_if"), MyIF)
 
 
+def test_map_flatten():
+    flatten = nir.Flatten({"input": np.array([1, 2, 10, 10])}, 2, 3)
+    torch_flatten = nir_interpreter.nir_to_torch(flatten, {})
+    assert isinstance(torch_flatten, torch.nn.Flatten)
+    assert torch_flatten.start_dim == 2
+    assert torch_flatten.end_dim == 3
+
+def test_map_linear_node():
+    w = np.random.random((2, 3)).astype(np.float32)
+    linear = nir.Linear(w)
+    module = nir_interpreter._map_nir_node_to_torch(linear, nir_interpreter.DEFAULT_MAP)
+    assert torch.allclose(module.weight, torch.from_numpy(w))
+    out = module(torch.ones(3))
+    assert out.shape == (2,)
+
 def test_map_single_node():
     w = np.random.random((2, 2))
     node = nir.Linear(w)
@@ -179,6 +186,7 @@ def test_map_single_node():
 def test_map_sum_pool_2d():
     pool = nir.SumPool2d(2, 1, 0)
     torch_pool = nir_interpreter.nir_to_torch(pool, {})
+    assert isinstance(torch_pool, torch.nn.LPPool2d)
     assert torch_pool.norm_type == 1
     assert torch_pool.kernel_size == 2
     assert torch_pool.stride == 1

@@ -51,6 +51,10 @@ def _default_map_conv2d(conv: nir.Conv2d) -> torch.nn.Conv2d:
     return c
 
 
+def _default_map_flatten(flatten: nir.Flatten) -> torch.nn.Flatten:
+    return torch.nn.Flatten(start_dim=flatten.start_dim, end_dim=flatten.end_dim)
+
+
 def _default_map_linear(linear: nir.Linear) -> torch.nn.Linear:
     module = torch.nn.Linear(
         linear.weight.shape[-1], linear.weight.shape[-2], bias=False
@@ -63,7 +67,7 @@ def _default_map_avgpool2d(pool: nir.AvgPool2d):
 
 def _default_map_sumpool2d(pool: nir.SumPool2d):
     # TODO: Add support for padding
-    return torch.nn.LPPool1d(norm_type=1, kernel_size=pool.kernel_size, stride=pool.stride)
+    return torch.nn.LPPool2d(norm_type=1, kernel_size=pool.kernel_size, stride=pool.stride)
 
 
 DEFAULT_MAP: NodeMapType = {
@@ -74,6 +78,7 @@ DEFAULT_MAP: NodeMapType = {
     nir.AvgPool2d: _default_map_avgpool2d,
     nir.Conv1d: _default_map_conv1d,
     nir.Conv2d: _default_map_conv2d,
+    nir.Flatten: _default_map_flatten,
     nir.Linear: _default_map_linear,
     nir.SumPool2d: _default_map_sumpool2d
 }
