@@ -58,15 +58,24 @@ def _default_map_linear(linear: nir.Linear) -> torch.nn.Linear:
     module.weight.data = torch.from_numpy(linear.weight)
     return module
 
+def _default_map_avgpool2d(pool: nir.AvgPool2d):
+    return torch.nn.AvgPool2d(kernel_size=pool.kernel_size, stride=pool.stride, padding=pool.padding)
+
+def _default_map_sumpool2d(pool: nir.SumPool2d):
+    # TODO: Add support for padding
+    return torch.nn.LPPool1d(norm_type=1, kernel_size=pool.kernel_size, stride=pool.stride)
+
 
 DEFAULT_MAP: NodeMapType = {
     nir.Input: lambda input: torch.nn.Identity(),
     nir.Output: lambda output: torch.nn.Identity(),
     # Node mappings
     nir.Affine: _default_map_affine,
+    nir.AvgPool2d: _default_map_avgpool2d,
     nir.Conv1d: _default_map_conv1d,
     nir.Conv2d: _default_map_conv2d,
     nir.Linear: _default_map_linear,
+    nir.SumPool2d: _default_map_sumpool2d
 }
 
 

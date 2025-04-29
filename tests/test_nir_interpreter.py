@@ -81,6 +81,14 @@ def test_map_nodes_with_periods_in_name():
     assert named_children[0][0] == "some_name"
 
 
+def test_map_avg_pool_2d():
+    pool = nir.AvgPool2d(2, 1, (1, 2))
+    torch_pool = nir_interpreter.nir_to_torch(pool, {})
+    assert torch_pool.kernel_size == 2
+    assert torch_pool.stride == 1
+    assert torch_pool.padding == (1, 2)
+
+
 def test_map_linear_node():
     w = np.random.random((2, 3)).astype(np.float32)
     linear = nir.Linear(w)
@@ -166,6 +174,14 @@ def test_map_single_node():
     node = nir.Linear(w)
     torch_linear = nir_interpreter.nir_to_torch(node, {})
     assert torch.allclose(torch_linear.weight, torch.from_numpy(w))
+
+
+def test_map_sum_pool_2d():
+    pool = nir.SumPool2d(2, 1, 0)
+    torch_pool = nir_interpreter.nir_to_torch(pool, {})
+    assert torch_pool.norm_type == 1
+    assert torch_pool.kernel_size == 2
+    assert torch_pool.stride == 1
 
 
 def test_fails_on_graphs_without_input_output():
