@@ -177,7 +177,7 @@ def _find_recursive_inputs(node: str, edges: typing.Set[typing.Tuple[str, str]])
     for other_node in inputs:
         # Check if there's a path from the other node back to our node
         # (meaning our node requires its output as input)
-        if other_node in outputs or _can_reach(other_node, node, edges):
+        if other_node in outputs or _can_reach(node, other_node, edges):
             recursive_inputs.add(other_node)
 
     return recursive_inputs
@@ -421,8 +421,7 @@ def _construct_fx_graph(
                 for src, target in sanitized_edges
             )
             is_recursive = (
-                module_name in recursive_modules
-                or has_recursive_inputs
+                has_recursive_inputs
                 or is_self_recursive
             )
 
@@ -521,6 +520,9 @@ def nir_to_torch(
     nir_node: typing.Union[str, nir.NIRNode],
     node_map: NodeMapType,
     default_map: NodeMapType = DEFAULT_MAP,
+    device: torch.device = "cpu",
+    dtype: torch.dtype = torch.float32
+
 ) -> torch.fx.GraphModule:
     """
     Maps a NIRGraph as an executable PyTorch GraphModule (torch.fx.GraphModule).
@@ -562,6 +564,8 @@ def nir_to_torch(
             default values to use in case where `node_map` entries are missing. The default value of
             this parameter defines mappings for simple modules like nir.Linear and nir.Input. Override
             this to provide custom defaults.
+        device (torch.device): The device to load the modules and parameters on. Defaults to "cpu"
+        dtype (torch.dtype): The precision with which to load the modules and parameters. Defaults to torch.float32
     """
     if isinstance(nir_node, str) or isinstance(nir_node, pathlib.Path):
         nir_node = nir.read(nir_node)
@@ -576,5 +580,6 @@ def nir_to_torch(
     # If the node is a graph, we map it recursively
     # - First convert all nodes into a module dictionary
     owning_module = _construct_module_dict_recursive(nir_node, map_with_defaults)
+    owning_module = owning_module.to(device=device, dtype=dtype)
     # - Then wire the graph recursively
     return _construct_fx_graph(owning_module=owning_module, nir_graph=nir_node)

@@ -224,6 +224,17 @@ def test_map_linear_graph_default():
     assert isinstance(out, typing.Tuple)
     assert out[0].shape == (2,)
 
+def test_map_sequential_graph():
+    l1 = nir.Linear(np.random.random((2, 2)))
+    l2 = nir.Linear(np.random.random((2, 2)))
+    l3 = nir.Linear(np.random.random((2, 2)))
+    l4 = nir.Linear(np.random.random((2, 2)))
+    graph = nir.NIRGraph.from_list(l1, l2, l3, l4)
+    module = nir_interpreter.nir_to_torch(graph, {})
+    data = torch.rand(2)
+    expected = torch.from_numpy(l4.weight @ (l3.weight @ (l2.weight @ (l1.weight @ data.numpy())))).float()
+    assert len(list(module.children())) == 4
+    assert torch.allclose(module(data)[0], expected)
 
 def test_map_subgraph_default():
     w = np.random.random((2, 3)).astype(np.float32)
