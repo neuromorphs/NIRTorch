@@ -54,7 +54,7 @@ def load(
     return_state: bool = True,
 ) -> nn.Module:
     """
-    DEPRECATED: Use `nirtorch.torch_to_nir` instead.
+    DEPRECATED: Use `nirtorch.nir_to_torch` instead.
 
     Load a NIR graph and convert it to a torch module using the given model map.
 

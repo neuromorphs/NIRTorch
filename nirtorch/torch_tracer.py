@@ -159,12 +159,12 @@ def torch_to_nir(
         # Add Node
         if node.op == "placeholder":
             if node.target == "input" or node.prev.op == "root":
-                nodes[str(node.name)] = nir.Input(np.array([1]))
+                nodes[str(node.name)] = nir.Input(np.array([1]))  # FIXME: Use correct shape
             else:
                 ignored_nodes.add(node)
                 continue
         elif node.op == "output":
-            nodes[str(node.name)] = nir.Output(np.array([1]))
+            nodes[str(node.name)] = nir.Output(np.array([1]))  # FIXME: Use correct shape
         elif node.op == "call_function":
             # Ensure that we bypass add nodes
             # TODO: Consider using transformations for this

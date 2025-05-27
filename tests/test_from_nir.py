@@ -76,7 +76,7 @@ def test_extract_lin():
     torchlin.bias.data = torch.nn.Parameter(lin.bias)
     y = torchlin(torchlin(x))
     g = nir.NIRGraph(
-        {"i": nir.Input(np.ones((1, 1))), "a": lin, "b": lin}, [("i", "a"), ("a", "b")]
+        {"i": nir.Input(np.ones((1))), "a": lin, "b": lin}, [("i", "a"), ("a", "b")]
     )
     m = load(g, _torch_model_map)
     assert isinstance(m.execution_order[1].elem, torch.nn.Linear)
@@ -104,14 +104,17 @@ def test_execute_stateful():
 
     g = nir.NIRGraph(
         nodes={
-            "i": nir.Input(np.array([1, 1])),
-            "li": nir.Flatten(np.array([1])),
-            "li2": nir.Flatten(np.array([1])),
+            "i": nir.Input(np.array([1,1,1])),
+            "li": nir.Flatten(np.array([1,1,1])),
+            "li2": nir.Flatten(np.array([1,1]), start_dim=0),
+            'o': nir.Output(np.array([1])),
         },
-        edges=[("i", "li"), ("li", "li2")],
+        edges=[("i", "li"), ("li", "li2"), ("li2", "o")],
     )  # Mock node
+
+    # TODO: Revisit and validate assertions
     m = load(g, _map_stateful)
-    out = m(torch.ones(10))
+    out = m(torch.ones(10, 10, 10))
     assert isinstance(out, tuple)
     out, state = out
     assert torch.allclose(out, torch.ones(10) * 3)

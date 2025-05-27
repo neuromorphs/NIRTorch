@@ -38,7 +38,10 @@ def test_extract_nir_edges():
     sample_data = torch.rand(1, 2, 16, 16)
 
     def dummy_model_map(module: nn.Module) -> nir.NIRNode:
-        return nir.NIRNode()
+        return nir.LI(tau=np.array([1.0]),
+                      r=np.array([1.0]),
+                      v_leak=np.array([0.0]))
+            
 
     nir_graph = extract_nir_graph(mymodel, dummy_model_map, sample_data, "mysequential")
 
