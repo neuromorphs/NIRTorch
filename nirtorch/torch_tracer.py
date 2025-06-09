@@ -19,7 +19,6 @@ DEFAULT_MAP: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]] = {
 
 
 class NIRTorchTracer(torch.fx.Tracer):
-
     def __init__(self, custom_leaf_modules: Tuple[torch.nn.Module] = None, **kwargs):
         """Extends PyTorch's default symbolic tracing with a set of custom leaf nodes"""
         super().__init__(**kwargs)
@@ -159,12 +158,12 @@ def torch_to_nir(
         # Add Node
         if node.op == "placeholder":
             if node.target == "input" or node.prev.op == "root":
-                nodes[str(node.name)] = nir.Input(np.array([1]))  # FIXME: Use correct shape
+                nodes[str(node.name)] = nir.Input(input_type=None)
             else:
                 ignored_nodes.add(node)
                 continue
         elif node.op == "output":
-            nodes[str(node.name)] = nir.Output(np.array([1]))  # FIXME: Use correct shape
+            nodes[str(node.name)] = nir.Output(output_type=None)
         elif node.op == "call_function":
             # Ensure that we bypass add nodes
             # TODO: Consider using transformations for this
@@ -217,8 +216,44 @@ def torch_to_nir(
             # Otherwise, add an edge
             elif in_node not in ignored_nodes:
                 edges.append((in_node.name, node.name))
+
+    # Update input_type for all Input nodes based on the follower nodes' input_type.
+    # The Input.input_type has been set to a placeholder value (np.array([1])) in the code above.
+    for node_name, node in nodes.items():
+        if isinstance(node, nir.Input):
+            follower_edges = [edge for edge in edges if edge[0] == node_name]
+            follower_nodes = [nodes[edge[1]] for edge in follower_edges]
+
+            # Check that all follower nodes have the same input_type
+            first_input_type = None
+            for follower_node in follower_nodes:
+                if first_input_type is None:
+                    first_input_type = follower_node.input_type
+                else:
+                    # Verify they match (code taken from to NIRGraph._check_types)
+                    if len(first_input_type) != len(follower_node.input_type):
+                        raise ValueError(
+                            f"Input type length mismatch for followers of {node_name}"
+                        )
+
+                    if len(first_input_type.keys()) == 1:
+                        first_type = list(first_input_type.values())[0]
+                        follower_type = list(follower_node.input_type.values())[0]
+                        if not np.array_equal(first_type, follower_type):
+                            raise ValueError(
+                                f"Input type mismatch for followers of {node_name}: {first_type} vs {follower_type}"
+                            )
+                    else:
+                        raise NotImplementedError(
+                            "Multiple input/output types not supported yet"
+                        )
+
+            # Update the input node's input_type if we found a valid type
+            if first_input_type is not None:
+                node.input_type = first_input_type
+                node.output_type = first_input_type
+
     graph = nir.NIRGraph(nodes=nodes, edges=edges)
-    graph.infer_types()
     return graph
 
 
