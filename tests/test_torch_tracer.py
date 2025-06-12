@@ -52,7 +52,7 @@ def test_trace_mapped_module_stateless():
     class MyModule(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.lin = torch.nn.Linear(1, 1)
+            self.lin = torch.nn.Linear(3, 2)
 
         def forward(self, x, state):
             return self.lin(x) + state
@@ -63,13 +63,16 @@ def test_trace_mapped_module_stateless():
     assert len(graph.edges) == 2
     assert len(_filter_edges(graph, nir.Input, nir.Affine)) == 1
     assert len(_filter_edges(graph, nir.Affine, nir.Output)) == 1
+    input_node_name, input_node = list(graph.inputs.items())[0]
+    assert input_node.input_type["input"] == np.array([3])
+    assert graph.input_type[input_node_name] == np.array([3])
 
 
 def test_trace_mapped_module_stateful():
     class MyModule(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            self.lin = torch.nn.Linear(1, 1)
+            self.lin = torch.nn.Linear(3, 2)
             self.state = torch.tensor([1.0])
 
         def forward(self, x):
@@ -81,6 +84,9 @@ def test_trace_mapped_module_stateful():
     assert len(graph.edges) == 2
     assert len(_filter_edges(graph, nir.Input, nir.Affine)) == 1
     assert len(_filter_edges(graph, nir.Affine, nir.Output)) == 1
+    input_node_name, input_node = list(graph.inputs.items())[0]
+    assert input_node.input_type["input"] == np.array([3])
+    assert graph.input_type[input_node_name] == np.array([3])
 
 
 def test_trace_addition():
