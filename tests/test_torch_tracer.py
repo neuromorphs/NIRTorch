@@ -101,7 +101,7 @@ def test_trace_addition():
 
 
 def test_trace_sequential():
-    model = torch.nn.Sequential(torch.nn.Linear(2, 1), torch.nn.Linear(1, 1))
+    model = torch.nn.Sequential(torch.nn.Linear(1, 2), torch.nn.Linear(2, 1))
     graph = torch_to_nir(model, {})
     assert graph.__class__ == nir.NIRGraph
     assert len(graph.nodes) == 4

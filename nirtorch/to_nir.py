@@ -160,4 +160,4 @@ def extract_nir_graph(
             logging.warn(f"removing self-connection {edge}")
             nir_edges.remove(edge)
 
-    return nir.NIRGraph(nir_nodes, nir_edges)
+    return nir.NIRGraph(nir_nodes, nir_edges, type_check=False)

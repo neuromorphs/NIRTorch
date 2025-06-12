@@ -41,7 +41,7 @@ def _map_graph_to_torch(
         (sanitize_name(src), sanitize_name(dst)) for src, dst in nir_graph.edges
     ]
     # Reconstruct NIR graph with torch modules
-    recon_graph = nir.NIRGraph(nodes, sanitized_edges)
+    recon_graph = nir.NIRGraph(nodes, sanitized_edges, type_check=False)
     # Build a TorchGraph for tracing and executing
     trace_graph = TorchGraph.from_torch_modules(recon_graph.nodes, recon_graph.edges)
     # Build and return a graph executor module
@@ -54,7 +54,7 @@ def load(
     return_state: bool = True,
 ) -> nn.Module:
     """
-    DEPRECATED: Use `nirtorch.torch_to_nir` instead.
+    DEPRECATED: Use `nirtorch.nir_to_torch` instead.
 
     Load a NIR graph and convert it to a torch module using the given model map.
 
