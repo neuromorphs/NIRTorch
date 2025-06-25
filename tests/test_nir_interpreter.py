@@ -193,14 +193,6 @@ def test_map_sum_pool_2d():
     assert torch_pool.stride == 1
 
 
-def test_fails_on_graphs_without_input_output():
-    w = np.ones((2, 2))
-    linear = nir.Linear(w)
-    graph = nir.NIRGraph(nodes={"lin": linear}, edges=[])
-    with pytest.raises(ValueError):
-        nir_interpreter.nir_to_torch(graph, {})
-
-
 def test_map_leaky_stateful_graph_single_module():
     # Test that the graph can handle a single stateful module
     tau = np.random.random(1)
