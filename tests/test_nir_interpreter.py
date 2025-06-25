@@ -137,7 +137,8 @@ def test_map_if_node():
     # This tests ensures that it works properly
     v_th = np.random.random(1)
     r = np.random.random(1)
-    nir_node = nir.IF(r=r, v_threshold=v_th)
+    v_reset = np.zeros(1)
+    nir_node = nir.IF(r=r, v_threshold=v_th, v_reset=v_reset)
 
     class MyIF(torch.nn.Module):
         def __init__(self, r, v_th):
