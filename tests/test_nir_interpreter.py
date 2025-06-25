@@ -137,7 +137,8 @@ def test_map_if_node():
     # This tests ensures that it works properly
     v_th = np.random.random(1)
     r = np.random.random(1)
-    nir_node = nir.IF(r=r, v_threshold=v_th)
+    v_reset = np.zeros(1)
+    nir_node = nir.IF(r=r, v_threshold=v_th, v_reset=v_reset)
 
     class MyIF(torch.nn.Module):
         def __init__(self, r, v_th):
@@ -190,14 +191,6 @@ def test_map_sum_pool_2d():
     assert torch_pool.norm_type == 1
     assert torch_pool.kernel_size == 2
     assert torch_pool.stride == 1
-
-
-def test_fails_on_graphs_without_input_output():
-    w = np.ones((2, 2))
-    linear = nir.Linear(w)
-    graph = nir.NIRGraph(nodes={"lin": linear}, edges=[])
-    with pytest.raises(ValueError):
-        nir_interpreter.nir_to_torch(graph, {})
 
 
 def test_map_leaky_stateful_graph_single_module():

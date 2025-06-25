@@ -208,6 +208,7 @@ def test_snn_branched():
     assert len(graph.node_list) == 13
 
 
+@pytest.mark.skip(reason="Norse currently missing CuBaLIF v_reset __init__ parameter")
 def test_input_output():
     from norse.torch import to_nir as norse_to_nir
 
