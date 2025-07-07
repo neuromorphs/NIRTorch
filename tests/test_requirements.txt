@@ -1,6 +1,4 @@
 pytest
 torch
-nir
 ruff
-git+https://github.com/norse/norse
 git+https://github.com/synsense/sinabs

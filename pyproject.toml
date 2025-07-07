@@ -30,7 +30,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = [ "torch", "nir" ]
+dependencies = [
+    "torch",
+    "nir>=1.0.6",
+]
 dynamic = ["version"] # Load the version from setuptools_scm
 
 [tool.setuptools_scm]
