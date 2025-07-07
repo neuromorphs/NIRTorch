@@ -104,10 +104,10 @@ def test_execute_stateful():
 
     g = nir.NIRGraph(
         nodes={
-            "i": nir.Input(np.array([1,1,1])),
-            "li": nir.Flatten(np.array([1,1,1])),
-            "li2": nir.Flatten(np.array([1,1]), start_dim=0),
-            'o': nir.Output(np.array([1])),
+            "i": nir.Input(np.array([1, 1, 1])),
+            "li": nir.Flatten(np.array([1, 1, 1])),
+            "li2": nir.Flatten(np.array([1, 1]), start_dim=0),
+            "o": nir.Output(np.array([1])),
         },
         edges=[("i", "li"), ("li", "li2"), ("li2", "o")],
     )  # Mock node
@@ -129,7 +129,12 @@ def test_execute_stateful():
 def test_execute_recurrent():
     w = np.ones((1, 1))
     g = nir.NIRGraph(
-        nodes={"in": nir.Input(np.ones(1)), "a": nir.Linear(w), "b": nir.Linear(w), "out": nir.Output(np.ones(1))},
+        nodes={
+            "in": nir.Input(np.ones(1)),
+            "a": nir.Linear(w),
+            "b": nir.Linear(w),
+            "out": nir.Output(np.ones(1)),
+        },
         edges=[("in", "a"), ("a", "b"), ("b", "a"), ("a", "out")],
     )
     m = load(g, _torch_model_map)

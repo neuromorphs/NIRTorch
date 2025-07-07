@@ -169,6 +169,7 @@ def test_map_flatten():
     assert torch_flatten.start_dim == 2
     assert torch_flatten.end_dim == 3
 
+
 def test_map_linear_node():
     w = np.random.random((2, 3)).astype(np.float32)
     linear = nir.Linear(w)
@@ -176,6 +177,7 @@ def test_map_linear_node():
     assert torch.allclose(module.weight, torch.from_numpy(w))
     out = module(torch.ones(3))
     assert out.shape == (2,)
+
 
 def test_map_single_node():
     w = np.random.random((2, 2))
@@ -241,6 +243,7 @@ def test_map_linear_graph_default():
     assert isinstance(out, typing.Tuple)
     assert out[0].shape == (2,)
 
+
 def test_map_sequential_graph():
     l1 = nir.Linear(np.random.random((2, 2)))
     l2 = nir.Linear(np.random.random((2, 2)))
@@ -249,9 +252,12 @@ def test_map_sequential_graph():
     graph = nir.NIRGraph.from_list(l1, l2, l3, l4)
     module = nir_interpreter.nir_to_torch(graph, {})
     data = torch.rand(2)
-    expected = torch.from_numpy(l4.weight @ (l3.weight @ (l2.weight @ (l1.weight @ data.numpy())))).float()
+    expected = torch.from_numpy(
+        l4.weight @ (l3.weight @ (l2.weight @ (l1.weight @ data.numpy())))
+    ).float()
     assert len(list(module.children())) == 4
     assert torch.allclose(module(data)[0], expected)
+
 
 def test_map_subgraph_default():
     w = np.random.random((2, 3)).astype(np.float32)

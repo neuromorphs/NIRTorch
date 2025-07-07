@@ -37,3 +37,13 @@ dependencies = [
 dynamic = ["version"] # Load the version from setuptools_scm
 
 [tool.setuptools_scm]
+
+[tool.uv.sources]
+nirtorch = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "pytest>=8.4.1",
+    "sinabs>=2.0.3",
+]
