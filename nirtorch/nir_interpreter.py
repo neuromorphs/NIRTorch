@@ -62,12 +62,18 @@ def _default_map_linear(linear: nir.Linear) -> torch.nn.Linear:
     module.weight.data = torch.from_numpy(linear.weight)
     return module
 
+
 def _default_map_avgpool2d(pool: nir.AvgPool2d):
-    return torch.nn.AvgPool2d(kernel_size=pool.kernel_size, stride=pool.stride, padding=pool.padding)
+    return torch.nn.AvgPool2d(
+        kernel_size=pool.kernel_size, stride=pool.stride, padding=pool.padding
+    )
+
 
 def _default_map_sumpool2d(pool: nir.SumPool2d):
     # TODO: Add support for padding
-    return torch.nn.LPPool2d(norm_type=1, kernel_size=pool.kernel_size, stride=pool.stride)
+    return torch.nn.LPPool2d(
+        norm_type=1, kernel_size=pool.kernel_size, stride=pool.stride
+    )
 
 
 DEFAULT_MAP: NodeMapType = {
@@ -80,7 +86,7 @@ DEFAULT_MAP: NodeMapType = {
     nir.Conv2d: _default_map_conv2d,
     nir.Flatten: _default_map_flatten,
     nir.Linear: _default_map_linear,
-    nir.SumPool2d: _default_map_sumpool2d
+    nir.SumPool2d: _default_map_sumpool2d,
 }
 
 
@@ -434,10 +440,7 @@ def _construct_fx_graph(
                 src == module_name and target == module_name
                 for src, target in sanitized_edges
             )
-            is_recursive = (
-                has_recursive_inputs
-                or is_self_recursive
-            )
+            is_recursive = has_recursive_inputs or is_self_recursive
 
             if is_recursive and module_name not in recursive_modules:
                 recursive_modules.add(module_name)
@@ -535,8 +538,7 @@ def nir_to_torch(
     node_map: NodeMapType,
     default_map: NodeMapType = DEFAULT_MAP,
     device: torch.device = "cpu",
-    dtype: torch.dtype = torch.float32
-
+    dtype: torch.dtype = torch.float32,
 ) -> torch.fx.GraphModule:
     """
     Maps a NIRGraph as an executable PyTorch GraphModule (torch.fx.GraphModule).

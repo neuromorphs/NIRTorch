@@ -74,6 +74,7 @@ def torch_to_nir(
     default_dict: Dict[
         torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]
     ] = DEFAULT_MAP,
+    type_check: bool = True,
 ) -> nir.NIRGraph:
     """
     Traces a PyTorch module and converts it to a NIR graph using the specified module map.
@@ -101,6 +102,7 @@ def torch_to_nir(
         default_dict (Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]): An dictionary
             of default mappings that, by default, maps trivial modules like torch.nn.Linear. Override
             the dictionary to provide custom mappings.
+        type_check (bool): Whether to run type checking on generated NIRGraphs
     """
     # Merge the default dictionary, if it exists
     if default_dict is not None:
@@ -254,7 +256,7 @@ def torch_to_nir(
                 node.input_type = first_input_type
                 node.output_type = first_input_type
 
-    graph = nir.NIRGraph(nodes=nodes, edges=edges)
+    graph = nir.NIRGraph(nodes=nodes, edges=edges, type_check=type_check)
     return graph
 
 
