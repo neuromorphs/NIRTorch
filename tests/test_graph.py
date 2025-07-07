@@ -2,7 +2,8 @@ import nir
 import pytest
 import torch
 import torch.nn as nn
-from norse.torch import LIBoxCell, LIFCell, SequentialState
+
+# from norse.torch import LIBoxCell, LIFCell, SequentialState
 from sinabs.layers import Merge
 
 from nirtorch import extract_nir_graph
@@ -33,6 +34,7 @@ class SinabsBranchedModel(nn.Module):
         return out4
 
 
+"""
 class NorseStatefulModel(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -43,7 +45,7 @@ class NorseStatefulModel(nn.Module):
         out1 = self.relu1(data)
         out2, _ = self.lif(out1)
         return out2
-
+"""
 
 input_type = (2, 28, 28)
 batch_size = 1
@@ -208,12 +210,15 @@ def test_snn_branched():
     assert len(graph.node_list) == 13
 
 
+"""
+@pytest.mark.skip(reason="Norse currently missing CuBaLIF v_reset __init__ parameter")
 def test_input_output():
     from norse.torch import to_nir as norse_to_nir
 
     g = norse_to_nir(NorseStatefulModel(), data)
     assert len(g.nodes) == 4  # in -> relu -> lif -> out
     assert len(g.edges) == 3
+"""
 
 
 def test_output_type_when_single_node():
@@ -239,6 +244,7 @@ def test_sequential_flatten():
     assert tuple(g.nodes["input"].input_type["input"]) == (3, 4)
 
 
+"""
 @pytest.mark.skip(reason="Not supported yet")
 def test_captures_recurrence_automatically():
     class Recmodel(torch.nn.Module):
@@ -263,6 +269,7 @@ def test_captures_recurrence_automatically():
     d = extract_nir_graph(m, _extract_norse_module, data)
     assert d.nodes.keys() == {"input", "l", "r", "output"}
     assert set(d.edges) == {("input", "r"), ("r", "l"), ("l", "output"), ("r", "r")}
+"""
 
 
 @pytest.mark.skip(reason="Subgraphs are currently flattened")

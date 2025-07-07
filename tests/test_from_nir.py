@@ -129,8 +129,8 @@ def test_execute_stateful():
 def test_execute_recurrent():
     w = np.ones((1, 1))
     g = nir.NIRGraph(
-        nodes={"in": nir.Input(np.ones(1)), "a": nir.Linear(w), "b": nir.Linear(w)},
-        edges=[("in", "a"), ("a", "b"), ("b", "a")],
+        nodes={"in": nir.Input(np.ones(1)), "a": nir.Linear(w), "b": nir.Linear(w), "out": nir.Output(np.ones(1))},
+        edges=[("in", "a"), ("a", "b"), ("b", "a"), ("a", "out")],
     )
     m = load(g, _torch_model_map)
     data = torch.ones(1, 1)
