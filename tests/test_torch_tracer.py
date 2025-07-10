@@ -35,6 +35,12 @@ def test_trace_default_linear():
     assert graph.__class__ == nir.Affine
 
 
+def test_trace_default_linear_no_bias():
+    model = torch.nn.Linear(1, 1, bias=False)
+    graph = torch_to_nir(model, {})
+    assert graph.__class__ == nir.Linear
+
+
 def test_trace_mapped_module():
     class MyModule(torch.nn.Module):
         def forward(self, x):

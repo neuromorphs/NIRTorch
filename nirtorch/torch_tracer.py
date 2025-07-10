@@ -7,12 +7,15 @@ import nir
 import torch
 
 
+def _map_linear(module: torch.nn.Module) -> nir.NIRNode:
+    if module.bias is None:
+        return nir.Linear(module.weight.detach().numpy())
+    else:
+        return nir.Affine(module.weight.detach().numpy(), module.bias.detach().numpy())
+
+
 DEFAULT_MAP: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]] = {
-    torch.nn.Linear: (
-        lambda module: nir.Affine(
-            module.weight.detach().numpy(), module.bias.detach().numpy()
-        )
-    )
+    torch.nn.Linear: _map_linear
     # TODO: Add more default nodes
     # https://github.com/neuromorphs/NIRTorch/issues/25
 }
