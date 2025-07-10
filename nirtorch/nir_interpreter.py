@@ -65,14 +65,26 @@ def _default_map_linear(linear: nir.Linear) -> torch.nn.Linear:
 
 def _default_map_avgpool2d(pool: nir.AvgPool2d):
     return torch.nn.AvgPool2d(
-        kernel_size=pool.kernel_size, stride=pool.stride, padding=pool.padding
+        kernel_size=(
+            pool.kernel_size
+            if type(pool.kernel_size) is int
+            else tuple(pool.kernel_size)
+        ),
+        stride=pool.stride if type(pool.stride) is int else tuple(pool.stride),
+        padding=pool.padding if type(pool.padding) is int else tuple(pool.padding),
     )
 
 
 def _default_map_sumpool2d(pool: nir.SumPool2d):
     # TODO: Add support for padding
     return torch.nn.LPPool2d(
-        norm_type=1, kernel_size=pool.kernel_size, stride=pool.stride
+        norm_type=1,
+        kernel_size=(
+            pool.kernel_size
+            if type(pool.kernel_size) is int
+            else tuple(pool.kernel_size)
+        ),
+        stride=pool.stride if type(pool.stride) is int else tuple(pool.stride),
     )
 
 
