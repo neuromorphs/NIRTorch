@@ -81,15 +81,6 @@ def test_map_nodes_with_periods_in_name():
     assert named_children[0][0] == "some_name"
 
 
-def test_map_avg_pool_2d():
-    pool = nir.AvgPool2d(2, 1, (1, 2))
-    torch_pool = nir_interpreter.nir_to_torch(pool, {})
-    assert isinstance(torch_pool, torch.nn.AvgPool2d)
-    assert torch_pool.kernel_size == 2
-    assert torch_pool.stride == 1
-    assert torch_pool.padding == (1, 2)
-
-
 def test_map_conv1d_node():
     w = np.random.random((2, 3, 4)).astype(np.float32)
     b = np.random.random((2,)).astype(np.float32)
@@ -186,13 +177,49 @@ def test_map_single_node():
     assert torch.allclose(torch_linear.weight, torch.from_numpy(w))
 
 
-def test_map_sum_pool_2d():
+def test_map_sum_pool_2d_int_args():
     pool = nir.SumPool2d(2, 1, 0)
     torch_pool = nir_interpreter.nir_to_torch(pool, {})
     assert isinstance(torch_pool, torch.nn.LPPool2d)
     assert torch_pool.norm_type == 1
     assert torch_pool.kernel_size == 2
     assert torch_pool.stride == 1
+    res = torch_pool(torch.ones(3, 5, 5))
+    assert torch.allclose(res, torch.full((3, 4, 4), 4.0))
+
+
+def test_map_sum_pool_2d_array_args():
+    pool = nir.SumPool2d(np.array([2, 1]), np.array([1, 1]), np.array([0, 0]))
+    torch_pool = nir_interpreter.nir_to_torch(pool, {})
+    assert isinstance(torch_pool, torch.nn.LPPool2d)
+    assert torch_pool.norm_type == 1
+    assert torch_pool.kernel_size == (2, 1)
+    assert torch_pool.stride == (1, 1)
+    res = torch_pool(torch.ones(3, 5, 5))
+    assert res.shape == (3, 4, 5)
+    assert torch.allclose(res, torch.full((3, 4, 5), 2.0))
+
+
+def test_map_avg_pool_2d_int_args():
+    pool = nir.AvgPool2d(3, 2, 1)
+    torch_pool = nir_interpreter.nir_to_torch(pool, {})
+    assert isinstance(torch_pool, torch.nn.AvgPool2d)
+    assert torch_pool.kernel_size == 3
+    assert torch_pool.stride == 2
+    assert torch_pool.padding == 1
+    res = torch_pool(torch.ones(3, 5, 5))
+    assert res.shape == (3, 3, 3)
+
+
+def test_map_avg_pool_2d_array_args():
+    pool = nir.AvgPool2d(np.array([3, 2]), np.array([2, 1]), np.array([1, 0]))
+    torch_pool = nir_interpreter.nir_to_torch(pool, {})
+    assert isinstance(torch_pool, torch.nn.AvgPool2d)
+    assert torch_pool.kernel_size == (3, 2)
+    assert torch_pool.stride == (2, 1)
+    assert torch_pool.padding == (1, 0)
+    res = torch_pool(torch.ones(3, 5, 5))
+    assert res.shape == (3, 3, 4)
 
 
 def test_map_leaky_stateful_graph_single_module():
