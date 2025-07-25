@@ -2,6 +2,7 @@ import collections
 import keyword
 import typing
 import pathlib
+import operator
 
 import nir
 import torch
@@ -397,11 +398,30 @@ def _construct_fx_graph(
             # Create a dummy state variable for each module
             default_state = _construct_state_recursive(owning_module)
             # - This has to happen *after* we create the input placeholders to avoid adding a parameter with default values before the input argument
-            state_argument = torch_graph.placeholder(
+            state_placeholder = torch_graph.placeholder(
                 "state",
                 type_expr=typing.Dict[str, typing.Any],
-                default_value=default_state,
+                default_value=None,
             )
+
+            # Check to set the state to the default state if it is None.
+            # We cannot use a dictionary as a default function parameter value because Python
+            # evaluates default arguments only once at function definition time.
+            # This would cause all function calls to share the same dictionary object,
+            # leading to unexpected state persistence between calls.
+            is_none = torch_graph.call_function(
+                operator.is_, args=(state_placeholder, None)
+            )
+            is_none.name = "is_none"
+
+            def ternary_operator(predicate, first, second):
+                return first if predicate else second
+
+            state_argument = torch_graph.call_function(
+                ternary_operator, args=(is_none, default_state, state_placeholder)
+            )
+            state_argument.name = "initialized_state"
+
             visited_nodes.add(module_name)
 
         elif isinstance(module, nir.Output):

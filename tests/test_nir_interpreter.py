@@ -481,3 +481,17 @@ def test_import_lif_new_api():
 def test_import_lif_new_api_string():
     m = nir_interpreter.nir_to_torch("tests/lif_norse.nir", _torch_node_map)
     assert m(torch.empty(1))[0].shape == (1,)
+
+
+def test_default_state_initialization():
+    g = nir.NIRGraph.from_list(nir.LI(np.ones(1), np.ones(1), np.zeros(1)))
+    m = nir_interpreter.nir_to_torch(g, _torch_node_map)
+
+    # Test that state is properly reset between calls when no state is provided.
+    # This verifies we avoid the mutable default arguments bug where a shared dictionary
+    # would cause state to persist unexpectedly between function calls.
+    first_state, first_spikes = m(torch.ones(1))
+    second_state, second_spikes = m(torch.ones(1))
+
+    assert first_state == second_state
+    assert first_spikes == second_spikes
