@@ -9,7 +9,7 @@
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/nirtorch?logo=pypi)](https://pypi.org/project/nirtorch/)
 [![GitHub Tag](https://img.shields.io/github/v/tag/neuromorphs/nirtorch?logo=github)](https://github.com/neuromorphs/NIRTorch/releases)
 [![Discord](https://img.shields.io/discord/1209533869733453844?logo=discord)](https://discord.gg/JRMRGP9h3c)
-
+[![Neuromorphic Computing](https://img.shields.io/badge/Collaboration_Network-Open_Neuromorphic-blue)](https://open-neuromorphic.org/neuromorphic-computing/)
 
 PyTorch helpers for the [Neuromorphic Intermediate Representation (NIR)](https://github.com/neuromorphs/nir).
 This is a no frills python package to enable torch based libraries to translate to NIR.
