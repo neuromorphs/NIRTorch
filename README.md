@@ -6,7 +6,7 @@
 # NIRTorch - Torch for the Neuromorphic Intermediate Representation
 
 [![Nature Communications Paper](https://zenodo.org/badge/DOI/10.1038/s41467-024-52259-9.svg)](https://doi.org/10.1038/s41467-024-52259-9)
-[![PyPI - Downloads](https://img.shields.io/pypi/dm/nirtorch?logo=pypi)](https://pypi.org/project/nirtorch/)
+[![PyPi Downloads](https://img.shields.io/pepy/dt/nirtorch)](https://pypi.org/project/nirtorch/)
 [![GitHub Tag](https://img.shields.io/github/v/tag/neuromorphs/nirtorch?logo=github)](https://github.com/neuromorphs/NIRTorch/releases)
 [![Discord](https://img.shields.io/discord/1209533869733453844?logo=discord)](https://discord.gg/JRMRGP9h3c)
 [![Neuromorphic Computing](https://img.shields.io/badge/Collaboration_Network-Open_Neuromorphic-blue)](https://open-neuromorphic.org/neuromorphic-computing/)
