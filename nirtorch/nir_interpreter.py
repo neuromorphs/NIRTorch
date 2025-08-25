@@ -467,7 +467,7 @@ def _construct_fx_graph(
                 )
 
             # 2. Determine if this is a recursive module
-            has_recursive_inputs = _find_recursive_inputs(module_name, nir_graph.edges)
+            has_recursive_inputs = _find_recursive_inputs(module_name, sanitized_edges)
             is_self_recursive = any(
                 src == module_name and target == module_name
                 for src, target in sanitized_edges
