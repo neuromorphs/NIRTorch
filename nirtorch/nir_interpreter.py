@@ -467,7 +467,7 @@ def _construct_fx_graph(
                 )
 
             # 2. Determine if this is a recursive module
-            has_recursive_inputs = _find_recursive_inputs(module_name, nir_graph.edges)
+            has_recursive_inputs = _find_recursive_inputs(module_name, sanitized_edges)
             is_self_recursive = any(
                 src == module_name and target == module_name
                 for src, target in sanitized_edges
@@ -495,22 +495,13 @@ def _construct_fx_graph(
                 state_node=state_argument,
             )
 
-            # - Handle missing inputs
+            # - Handle missing inputs: always defer until all non-recursive inputs exist
             if None in module_input_nodes:
-                if is_recursive:
-                    # Use available inputs where possible, dummy inputs where needed
-                    module_input_nodes = tuple(
-                        node if node is not None else dummy_input
-                        for node in module_input_nodes
-                    )
-                else:
-                    # This module depends on another module that hasn't yet been constructed
-                    # Enqueue for later processing
-                    module_input_nodes = tuple(
-                        [dummy_input for _ in module_input_nodes]
-                    )
-                    module_queue.append((module_name, module))
-                    continue
+                module_input_nodes = tuple(
+                    [dummy_input for _ in module_input_nodes]
+                )
+                module_queue.append((module_name, module))
+                continue
 
             # 5. Call the module
             # - If we've already processed this node and it's not a recursive module, move on
