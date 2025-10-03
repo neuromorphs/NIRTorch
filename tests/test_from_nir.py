@@ -53,6 +53,16 @@ def _recurrent_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module
         return mapped_model
 
 
+def _feedback_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
+    class FeedbackNode(torch.nn.Module):
+        def __init__(self, node):
+            super().__init__()
+            self.node = node
+        def forward(self, x):
+            return x
+
+    return FeedbackNode(m)
+
 def test_extract_empty():
     g = nir.NIRGraph({}, [])
     with pytest.raises(ValueError):
@@ -173,3 +183,6 @@ def test_deprecation_warning():
         load(g, _recurrent_model_map)
         assert len(warn) == 1
         assert isinstance(warn[0].message, DeprecationWarning)
+
+def test_import_feedback_graph():
+    g = load("tests/feedback_graph.nir", _feedback_model_map, type_check=False)

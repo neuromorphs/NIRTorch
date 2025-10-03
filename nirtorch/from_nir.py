@@ -52,6 +52,7 @@ def load(
     nir_graph: Union[nir.NIRNode, str],
     model_map: Callable[[nir.NIRNode], nn.Module],
     return_state: bool = True,
+    type_check: bool = True
 ) -> nn.Module:
     """
     DEPRECATED: Use `nirtorch.nir_to_torch` instead.
@@ -69,6 +70,9 @@ def load(
             tuple of [output, state], where state is a GraphExecutorState object.
             If False, only the NIR graph output will be returned. Note that state is
             required for recurrence to work in the graphs.
+        type_check (bool): Type checks the graph by ensuring that all input/output
+            pairs have the same type. If disabled, the graph may break at runtime.
+            Defaults to True.
 
     Returns:
         nn.Module: The generated torch module
@@ -80,5 +84,5 @@ def load(
     )
 
     if isinstance(nir_graph, str):
-        nir_graph = nir.read(nir_graph)
+        nir_graph = nir.read(nir_graph, type_check=type_check)
     return _map_graph_to_torch(nir_graph, model_map, return_state=return_state)
