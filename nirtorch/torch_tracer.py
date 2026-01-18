@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Set, Tuple
+from typing import Any, Callable, Dict, Optional, Set, Tuple, Type
 import operator
 
 import numpy as np
@@ -78,6 +78,8 @@ def torch_to_nir(
         torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]
     ] = DEFAULT_MAP,
     type_check: bool = True,
+    stateful_modules: Optional[Set[Type[torch.nn.Module]]] = None,
+    concrete_args: Optional[Dict[str, Any]] = None,
 ) -> nir.NIRGraph:
     """
     Traces a PyTorch module and converts it to a NIR graph using the specified module map.
@@ -106,6 +108,13 @@ def torch_to_nir(
             of default mappings that, by default, maps trivial modules like torch.nn.Linear. Override
             the dictionary to provide custom mappings.
         type_check (bool): Whether to run type checking on generated NIRGraphs
+        stateful_modules (Optional[Set[Type[torch.nn.Module]]]): A set of module types that return
+            (output, state) tuples. When these modules are encountered, getitem operations extracting
+            index 0 (output) will be treated as signal flow, while index 1 (state) will be ignored.
+            This enables tracing through modules with stateful return signatures.
+        concrete_args (Optional[Dict[str, Any]]): A dictionary of concrete values for function arguments
+            during tracing. For example, {'state': None} will treat the 'state' argument as the concrete
+            value None rather than a symbolic Proxy, which can help with tracing stateful modules.
     """
     # Merge the default dictionary, if it exists
     if default_dict is not None:
@@ -117,7 +126,7 @@ def torch_to_nir(
 
     # Trace the graph
     tracer = NIRTorchTracer(module_map.keys())
-    traced = tracer.trace(module)
+    traced = tracer.trace(module, concrete_args=concrete_args)
 
     if len(traced.nodes) == 2 and len(list(tracer.root.children())) == 0:
         raise ValueError(
@@ -176,6 +185,32 @@ def torch_to_nir(
             #       https://pytorch.org/docs/stable/fx.html#torch.fx.Transformer
             if node.target == operator.add:
                 bypass_nodes.add(node)
+            # Ignore assertion functions inserted by torch.fx for concrete_args validation
+            elif getattr(node.target, "__name__", "") == "_assert_is_none":
+                ignored_nodes.add(node)
+            # Handle getitem for stateful modules that return (output, state) tuples
+            elif node.target == operator.getitem:
+                source_node = node.args[0]
+                index = node.args[1]
+                # Check if this getitem is extracting from a stateful module's output
+                if (
+                    stateful_modules
+                    and source_node.op == "call_module"
+                ):
+                    torch_module = graph_module.get_submodule(source_node.target)
+                    if type(torch_module) in stateful_modules:
+                        if index == 0:
+                            # Index 0 is the output tensor - bypass to follow signal flow
+                            bypass_nodes.add(node)
+                        else:
+                            # Index 1+ is state - ignore it
+                            ignored_nodes.add(node)
+                        continue
+                # If not a stateful module getitem, raise an error
+                raise ValueError(
+                    "getitem is only supported for stateful modules specified in stateful_modules. "
+                    "Please modify your model or add the module type to stateful_modules."
+                )
             # Raise a warning if we encounter other methods than addition
             else:
                 raise ValueError(

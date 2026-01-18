@@ -199,3 +199,126 @@ def test_recursive_stateful():
     model = MyModule()
     graph = torch_to_nir(model, {})
     assert graph.__class__ == nir.NIRGraph
+
+
+def test_stateful_module_with_tuple_return():
+    """Test tracing a module that returns (output, state) tuples."""
+
+    class StatefulCell(torch.nn.Module):
+        """A simple stateful module that returns (output, state) tuple."""
+
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(2, 2)
+
+        def forward(self, x, state=None):
+            if state is None:
+                state = torch.zeros(2)
+            output = self.linear(x) + state
+            new_state = output.detach()
+            return output, new_state
+
+    def map_stateful_cell(module):
+        return nir.Affine(
+            module.linear.weight.detach().numpy(),
+            module.linear.bias.detach().numpy(),
+        )
+
+    model = StatefulCell()
+    graph = torch_to_nir(
+        model,
+        {StatefulCell: map_stateful_cell},
+        stateful_modules={StatefulCell},
+    )
+    assert graph.__class__ == nir.Affine
+
+
+def test_sequential_with_stateful_modules():
+    """Test tracing a sequential model containing stateful modules."""
+
+    class StatefulCell(torch.nn.Module):
+        """A simple stateful module that returns (output, state) tuple."""
+
+        def __init__(self, in_features, out_features):
+            super().__init__()
+            self.linear = torch.nn.Linear(in_features, out_features)
+
+        def forward(self, x, state=None):
+            if state is None:
+                state = torch.zeros(self.linear.out_features)
+            output = self.linear(x) + state
+            new_state = output.detach()
+            return output, new_state
+
+    class SequentialStateful(torch.nn.Module):
+        """A sequential module that handles stateful children."""
+
+        def __init__(self, *modules):
+            super().__init__()
+            self.layers = torch.nn.ModuleList(modules)
+            self.stateful = [isinstance(m, StatefulCell) for m in modules]
+
+        def forward(self, x, state=None):
+            if state is None:
+                state = [None] * len(self.layers)
+            output_states = []
+            for i, layer in enumerate(self.layers):
+                if self.stateful[i]:
+                    x, s = layer(x, state[i])
+                    output_states.append(s)
+                else:
+                    x = layer(x)
+                    output_states.append(None)
+            return x, output_states
+
+    def map_stateful_cell(module):
+        return nir.Affine(
+            module.linear.weight.detach().numpy(),
+            module.linear.bias.detach().numpy(),
+        )
+
+    model = SequentialStateful(
+        StatefulCell(3, 4),
+        torch.nn.Linear(4, 2),
+    )
+
+    graph = torch_to_nir(
+        model,
+        {StatefulCell: map_stateful_cell},
+        stateful_modules={StatefulCell},
+        concrete_args={"state": None},
+    )
+
+    assert graph.__class__ == nir.NIRGraph
+    assert len(graph.nodes) == 4  # input, StatefulCell, Linear, output
+    assert len(graph.edges) == 3
+    assert len(_filter_nodes(graph, nir.Input)) == 1
+    assert len(_filter_nodes(graph, nir.Output)) == 1
+    assert len(_filter_nodes(graph, nir.Affine)) == 2
+    assert len(_filter_edges(graph, nir.Input, nir.Affine)) == 1
+    assert len(_filter_edges(graph, nir.Affine, nir.Affine)) == 1
+    assert len(_filter_edges(graph, nir.Affine, nir.Output)) == 1
+
+
+def test_concrete_args_state_none():
+    """Test that concrete_args={'state': None} allows tracing with state parameter."""
+
+    class ModuleWithState(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(2, 2)
+
+        def forward(self, x, state=None):
+            # When state is None (concrete), this creates a real list, not a Proxy
+            if state is None:
+                state = [0.0]
+            return self.linear(x)
+
+    model = ModuleWithState()
+    graph = torch_to_nir(
+        model,
+        {},
+        concrete_args={"state": None},
+    )
+    assert graph.__class__ == nir.NIRGraph
+    assert len(_filter_nodes(graph, nir.Affine)) == 1
