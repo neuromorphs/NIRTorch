@@ -22,7 +22,7 @@ pip install nirtorch
 ## Usage
 
 > [!TIP]
-> Read the full documentation at [neuroir.org/docs](https://neuroir.org/docs/dev_pytorch.html).
+> Read the full documentation at [neuroir.org/docs](https://neuroir.org/docs/dev-pytorch/).
 
 
 NIRTorch is typically only interfaced by library/hardwarae developers.
@@ -86,7 +86,7 @@ def to_nir(module: torch.nn.Module) -> nir.NIRNode:
         _my_module_dict  # The dictionary that maps Norse module to NIR
     )
 ```
-Read the full documentation at [neuroir.org/docs](https://neuroir.org/docs/dev_pytorch.html).
+Read the full documentation at [neuroir.org/docs](https://neuroir.org/docs/dev-pytorch/).
 
 
 ## Acknowledgements
