@@ -73,7 +73,7 @@ class NIRTorchTransformer(torch.fx.Transformer):
 
 def torch_to_nir(
     module: torch.nn.Module,
-    module_map: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]],
+    module_map: Dict[torch.nn.Module, Callable[[torch.nn.Module], Optional[nir.NIRNode]]],
     default_dict: Dict[
         torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]
     ] = DEFAULT_MAP,
@@ -102,8 +102,10 @@ def torch_to_nir(
 
     Args:
         module (torch.nn.Module): The module of interest
-        module_map (Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]): A dictionary that maps
-            a given module type to a function that can convert the model to an NIRNode type
+        module_map (Dict[torch.nn.Module, Callable[[torch.nn.Module], Optional[nir.NIRNode]]]):
+            A dictionary that maps a given module type to a function that can convert the model
+            to an NIRNode type. If the return value of the function is None, the node will instead
+            be bypassed, and its predecessor nodes will directly be connected to its successor nodes.
         default_dict (Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]]): An dictionary
             of default mappings that, by default, maps trivial modules like torch.nn.Linear. Override
             the dictionary to provide custom mappings.
@@ -226,8 +228,18 @@ def torch_to_nir(
                 )
         elif node.op == "call_module":
             torch_module = graph_module.get_submodule(node.target)
-            nir_module = module_map[torch_module.__class__](torch_module)
-            nodes[str(node.name)] = nir_module
+            if torch_module.__class__ in module_map:
+                nir_module = module_map[torch_module.__class__](torch_module)
+                # Mapping to None bypasses the node
+                if nir_module is not None:
+                    nodes[str(node.name)] = nir_module
+                else:
+                    bypass_nodes.add(node)
+            else:
+                raise ValueError(
+                    f"Unknown module encountered: {torch_module.__class__}. "
+                    f"To bypass it, map '{torch_module.__class__.__name__}: None' through the 'module_map'."
+                )
         elif node.op == "get_attr":
             # Bypass attribute
             bypass_nodes.add(node)

@@ -322,3 +322,29 @@ def test_concrete_args_state_none():
     )
     assert graph.__class__ == nir.NIRGraph
     assert len(_filter_nodes(graph, nir.Affine)) == 1
+
+
+def test_unknown_module_error():
+    """Test that unknown modules (not contained in 'module_map') raise error by default."""
+    model = torch.nn.Sequential(torch.nn.Linear(1, 2), torch.nn.Dropout(), torch.nn.Linear(2, 1))
+    with pytest.raises(ValueError):
+        torch_to_nir(model, {})
+
+
+def test_unknown_module_bypass():
+    """Test bypassing of unknown modules (not contained in 'module_map')."""
+    def map_none(_):
+        return None
+
+    model = torch.nn.Sequential(torch.nn.Linear(1, 2), torch.nn.Dropout(), torch.nn.Linear(2, 1))
+    graph = torch_to_nir(model, {torch.nn.Dropout: map_none})
+
+    assert graph.__class__ == nir.NIRGraph
+    assert len(graph.nodes) == 4  # input, Linear, Linear, output
+    assert len(graph.edges) == 3
+    assert len(_filter_nodes(graph, nir.Input)) == 1
+    assert len(_filter_nodes(graph, nir.Output)) == 1
+    assert len(_filter_nodes(graph, nir.Affine)) == 2
+    assert len(_filter_edges(graph, nir.Input, nir.Affine)) == 1
+    assert len(_filter_edges(graph, nir.Affine, nir.Affine)) == 1
+    assert len(_filter_edges(graph, nir.Affine, nir.Output)) == 1
