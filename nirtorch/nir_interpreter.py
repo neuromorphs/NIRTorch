@@ -623,4 +623,5 @@ def nir_to_torch(
     owning_module = owning_module.to(device=device, dtype=dtype)
     # - Then wire the graph recursively
     return _construct_fx_graph(
-        owning_module=owning_module, nir_graph=nir_node, node_map=node_map)
+        owning_module=owning_module, nir_graph=nir_node, node_map=node_map
+    )
