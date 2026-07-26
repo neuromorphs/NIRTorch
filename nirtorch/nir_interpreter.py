@@ -150,7 +150,7 @@ def _construct_module_dict_recursive(
     owning_module = torch.nn.ModuleDict()
     for name, node in nir_graph.nodes.items():
         # Recurse into subgraphs
-        if isinstance(node, nir.NIRGraph):
+        if isinstance(node, nir.NIRGraph) and not nir.NIRGraph in node_map:
             owning_module[_sanitize_name(name)] = _construct_module_dict_recursive(
                 node, node_map
             )
@@ -315,7 +315,7 @@ def _construct_state_recursive(
 
 
 def _construct_fx_graph(
-    owning_module: torch.nn.ModuleDict, nir_graph: nir.NIRGraph
+    owning_module: torch.nn.ModuleDict, nir_graph: nir.NIRGraph, node_map: dict
 ) -> torch.fx.GraphModule:
     """Creates a GraphModule from a module dictionary and a NIRGraph by walking over all the edges.
     The GraphModule consists of a torch.fx Graph with nodes representing function and module calls to
@@ -337,6 +337,8 @@ def _construct_fx_graph(
         owning_module (torch.nn.ModuleDict): The module dictionary contains nodes that are already mapped from NIR to PyTorch.
         nir_graph (nir.NIRGraph): The NIRGraph to trace. Mainly used for connectivity (edges) at this point, since
             the modules have already been converted.
+        node_map (Dict[nir.NIRNode, Callable[[nir.NIRNode], torch.nn.Module]]): A dictionary that
+            maps NIR nodes into Torch modules.
     """
     # Ensure that the graph has input and output nodes
     has_input = any(isinstance(node, nir.Input) for node in nir_graph.nodes.values())
@@ -460,9 +462,9 @@ def _construct_fx_graph(
             # (6) handle output and state
 
             # 1. Recursively wire subgraphs
-            if isinstance(module, nir.NIRGraph):
+            if isinstance(module, nir.NIRGraph) and not nir.NIRGraph in node_map:
                 owning_module[module_name] = _construct_fx_graph(
-                    owning_module[module_name], module
+                    owning_module[module_name], module, node_map=node_map
                 )
 
             # 2. Determine if this is a recursive module
@@ -610,7 +612,7 @@ def nir_to_torch(
     map_with_defaults = dict(default_map)
     map_with_defaults.update(node_map)  # Overwrite defaults with node_map
 
-    # If the node is a leaf node (not a graph), we only mad that single node
+    # If the node is a leaf node (not a graph), we only map that single node
     if not isinstance(nir_node, nir.NIRGraph):
         mapped_node = _map_nir_node_to_torch(nir_node, map_with_defaults)
         return mapped_node
@@ -620,4 +622,5 @@ def nir_to_torch(
     owning_module = _construct_module_dict_recursive(nir_node, map_with_defaults)
     owning_module = owning_module.to(device=device, dtype=dtype)
     # - Then wire the graph recursively
-    return _construct_fx_graph(owning_module=owning_module, nir_graph=nir_node)
+    return _construct_fx_graph(
+        owning_module=owning_module, nir_graph=nir_node, node_map=node_map)
