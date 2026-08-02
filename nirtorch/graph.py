@@ -3,11 +3,12 @@ from __future__ import annotations
 import warnings
 from collections.abc import Callable
 from numbers import Number
-from typing import Any, Self
+from typing import Any
 
 import nir
 import torch
 from torch import nn
+from typing_extensions import Self
 
 from .utils import sanitize_name
 

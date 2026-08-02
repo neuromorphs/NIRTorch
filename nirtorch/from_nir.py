@@ -77,7 +77,7 @@ def load(
     """
     warnings.warn(
         "nirtorch.load is being deprecated in favour of nirtorch.nir_to_torch. "
-        "Please refer to https://neuroir.org/docs/dev_pytorch.html for detailed instructions",
+        "Please refer to https://neuroir.org/docs/dev_pytorch/ for detailed instructions",
         DeprecationWarning,
     )
 
