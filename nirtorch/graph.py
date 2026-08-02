@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import warnings
 from collections.abc import Callable
 from numbers import Number
@@ -42,7 +43,7 @@ class Node:
         self,
         elem: Any,
         name: str,
-        outgoing_nodes: dict["Node", torch.Tensor] | None = None,
+        outgoing_nodes: dict[Node, torch.Tensor] | None = None,
     ) -> None:
         self.elem = elem
         self.name = name
@@ -51,7 +52,7 @@ class Node:
         else:
             self.outgoing_nodes = outgoing_nodes
 
-    def add_outgoing(self, node: "Node", shape=None) -> None:
+    def add_outgoing(self, node: Node, shape=None) -> None:
         self.outgoing_nodes[node] = shape
 
     def __str__(self) -> str:
@@ -72,7 +73,7 @@ class Node:
         return hash(self.elem)
 
 
-def _find_input_nodes(graph: "TorchGraph") -> set[nir.Input]:
+def _find_input_nodes(graph: TorchGraph) -> set[nir.Input]:
     # First, check if the graph is empty or singular
     if len(graph.node_list) == 0:
         raise ValueError("Cannot find the input of an empty graph")
@@ -117,7 +118,7 @@ class TorchGraph:
     @staticmethod
     def from_torch_modules(
         nodes: dict[str, nn.Module], edges: list[tuple[str, str]]
-    ) -> "TorchGraph":
+    ) -> TorchGraph:
         module_names = {module: sanitize_name(name) for name, module in nodes.items()}
         # Construct the graph by adding edges and, finally, inputs
         graph = TorchGraph(module_names=module_names, inputs=set())
@@ -221,7 +222,7 @@ class TorchGraph:
         """
         return isinstance(elem, nn.Module) and elem not in self.module_names
 
-    def populate_from(self, other_graph: "TorchGraph"):
+    def populate_from(self, other_graph: TorchGraph):
         self.module_output_types.update(other_graph.module_output_types)
         for node in other_graph.node_list:
             for outgoing_node, shape in node.outgoing_nodes.items():
@@ -251,14 +252,14 @@ class TorchGraph:
 
         return mermaid_md + "\n```\n"
 
-    def leaf_only(self) -> "TorchGraph":
+    def leaf_only(self) -> TorchGraph:
         leaf_modules = self.get_leaf_modules()
         filtered_graph = TorchGraph(leaf_modules, inputs=self.inputs)
         # Populate edges
         filtered_graph.populate_from(self)
         return filtered_graph
 
-    def ignore_submodules_of(self, classes: list[type]) -> "TorchGraph":
+    def ignore_submodules_of(self, classes: list[type]) -> TorchGraph:
         new_named_modules = {}
 
         # Gather a list of all top level modules, whose submodules are to be ignored
@@ -303,7 +304,7 @@ class TorchGraph:
                     source_node_list.append(source_node)
         return source_node_list
 
-    def ignore_tensors(self) -> "TorchGraph":
+    def ignore_tensors(self) -> TorchGraph:
         """Simplify the graph by ignoring all the tensors in it.
 
         Returns:
@@ -311,7 +312,7 @@ class TorchGraph:
         """
         return self.ignore_nodes(torch.Tensor)
 
-    def ignore_nodes(self, class_type: type) -> "TorchGraph":
+    def ignore_nodes(self, class_type: type) -> TorchGraph:
         # Filter module names to remove the given class type
         new_module_names = {
             k: v for k, v in self.module_names.items() if not isinstance(k, class_type)
