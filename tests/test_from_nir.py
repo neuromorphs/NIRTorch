@@ -18,7 +18,7 @@ def _torch_model_map(m: nir.NIRNode, device: str = "cpu") -> torch.nn.Module:
         lin = torch.nn.Linear(*m.weight.shape[-2:], bias=False)
         lin.weight.data = torch.nn.Parameter(torch.tensor(m.weight).to(device).float())
         return lin
-    elif isinstance(m, nir.Input) or isinstance(m, nir.Output):
+    elif isinstance(m, (nir.Input, nir.Output)):
         return torch.nn.Identity()
 
 
@@ -76,7 +76,7 @@ def test_extract_lin():
     torchlin.bias.data = torch.nn.Parameter(lin.bias)
     y = torchlin(torchlin(x))
     g = nir.NIRGraph(
-        {"i": nir.Input(np.ones((1))), "a": lin, "b": lin}, [("i", "a"), ("a", "b")]
+        {"i": nir.Input(np.ones(1)), "a": lin, "b": lin}, [("i", "a"), ("a", "b")]
     )
     m = load(g, _torch_model_map)
     assert isinstance(m.execution_order[1].elem, torch.nn.Linear)
@@ -144,7 +144,7 @@ def test_execute_recurrent():
     y1 = m(data)
     y2 = m(data)
     assert torch.allclose(y1[0], y2[0])
-    out, s = m(*m(data))
+    out, _s = m(*m(data))
     assert torch.allclose(out, torch.tensor(2.0))
 
 

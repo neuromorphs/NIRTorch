@@ -4,7 +4,7 @@ import nir
 import numpy as np
 import pytest
 import torch
-import torch.nn as nn
+from torch import nn
 
 from nirtorch.to_nir import extract_nir_graph
 

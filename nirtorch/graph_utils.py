@@ -1,4 +1,5 @@
-from typing import Callable, List, Set, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 from torch import nn
 
@@ -7,19 +8,19 @@ T = TypeVar("T")
 
 def find_children(node, edges):
     """Given a node and the edges of a graph, find all direct children of that node."""
-    return set(child for (parent, child) in edges if parent == node)
+    return {child for (parent, child) in edges if parent == node}
 
 
 def find_parents(node, edges):
     """Given a node and the edges of a graph, find all direct parents of that node."""
-    return set(parent for (parent, child) in edges if child == node)
+    return {parent for (parent, child) in edges if child == node}
 
 
 def find_all_ancestors(
     node, edges, roots=None, parents_found=None, nodes_inspected=None
 ):
     """Given a node and the edges of a graph, find all ancesters of that node."""
-    roots = roots  # or find_roots(edges)
+    # or find_roots(edges)
     if node in roots:
         return set()
 
@@ -69,8 +70,8 @@ def find_all_ancestors(
 
 
 def trace_execution(
-    node: T, edge_fn: Callable[[T], List[T]], visited: Set[T] = None
-) -> List[T]:
+    node: T, edge_fn: Callable[[T], list[T]], visited: set[T] | None = None
+) -> list[T]:
     """Traces the execution of a node by listing them in order, coloring recursive nodes
     to avoid adding the same node twice."""
     if visited is None:
