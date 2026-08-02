@@ -150,7 +150,7 @@ def _construct_module_dict_recursive(
     owning_module = torch.nn.ModuleDict()
     for name, node in nir_graph.nodes.items():
         # Recurse into subgraphs
-        if isinstance(node, nir.NIRGraph) and not nir.NIRGraph in node_map:
+        if isinstance(node, nir.NIRGraph) and nir.NIRGraph not in node_map:
             owning_module[_sanitize_name(name)] = _construct_module_dict_recursive(
                 node, node_map
             )
@@ -462,7 +462,7 @@ def _construct_fx_graph(
             # (6) handle output and state
 
             # 1. Recursively wire subgraphs
-            if isinstance(module, nir.NIRGraph) and not nir.NIRGraph in node_map:
+            if isinstance(module, nir.NIRGraph) and nir.NIRGraph not in node_map:
                 owning_module[module_name] = _construct_fx_graph(
                     owning_module[module_name], module, node_map=node_map
                 )
