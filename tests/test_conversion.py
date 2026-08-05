@@ -1,6 +1,6 @@
 import nir
 import torch
-import torch.nn as nn
+from torch import nn
 
 import nirtorch
 

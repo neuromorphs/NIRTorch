@@ -1,13 +1,13 @@
 import nir
 import pytest
 import torch
-import torch.nn as nn
 
 # from norse.torch import LIBoxCell, LIFCell, SequentialState
 from sinabs.layers import Merge
+from torch import nn
 
 from nirtorch import extract_nir_graph
-from nirtorch.graph import TorchGraph, named_modules_map, GraphTracer
+from nirtorch.graph import GraphTracer, TorchGraph, named_modules_map
 
 
 class TupleModule(torch.nn.Module):
@@ -229,7 +229,7 @@ def test_output_type_when_single_node():
     )
     assert "input" in g.nodes
     assert "output" in g.nodes
-    g.nodes["output"].output_type["output"] == torch.Size([1])
+    assert g.nodes["output"].output_type["output"] == torch.Size([1])
 
 
 def test_sequential_flatten():
@@ -280,7 +280,7 @@ def test_captures_recurrence_manually():
         elif isinstance(module, torch.nn.ReLU):
             return nir.NIRGraph(nodes={"i": nir.I(torch.randn(1))}, edges=[("i", "i")])
         else:
-            raise ValueError(f"Unsupported module {module}")
+            raise TypeError(f"Unsupported module {module}")
 
     m = torch.nn.Sequential(torch.nn.Linear(1, 1), torch.nn.ReLU())
     data = torch.randn((1, 1))

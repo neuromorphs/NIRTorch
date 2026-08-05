@@ -1,10 +1,9 @@
-import typing
 import warnings
 
 import nir
 import numpy as np
-import torch
 import pytest
+import torch
 
 from nirtorch import nir_interpreter
 
@@ -232,13 +231,13 @@ def test_map_leaky_stateful_graph_single_module():
     module = nir_interpreter.nir_to_torch(nir.NIRGraph.from_list(li), {nir.LI: _map_li})
     data = torch.rand(1)
     output = module(data)
-    assert isinstance(output, typing.Tuple)
+    assert isinstance(output, tuple)
     module_output = li_module(data)
     assert torch.allclose(output[0], module_output[0])
     assert torch.allclose(output[1]["li"], module_output[1])
     # Application a second time should yield a different, stateful response
     output = module(output[0], output[1])
-    assert isinstance(output, typing.Tuple)
+    assert isinstance(output, tuple)
     module_output = li_module(*module_output)
     assert torch.allclose(output[0], module_output[0])
 
@@ -255,7 +254,7 @@ def test_map_leaky_stateful_graph_sequential_modules():
     )
     data = torch.rand(1)
     output = module(data)
-    assert isinstance(output, typing.Tuple)
+    assert isinstance(output, tuple)
     module_result = li_module(li_module(data)[0])[0]
     assert torch.allclose(output[0], module_result)
 
@@ -267,7 +266,7 @@ def test_map_linear_graph_default():
     module = nir_interpreter.nir_to_torch(graph, {})
     assert torch.allclose(module.linear.weight, torch.from_numpy(w))
     out = module(torch.ones(3))
-    assert isinstance(out, typing.Tuple)
+    assert isinstance(out, tuple)
     assert out[0].shape == (2,)
 
 
@@ -294,7 +293,7 @@ def test_map_subgraph_default():
     module = nir_interpreter.nir_to_torch(graph, {})
     assert torch.allclose(module.nirgraph.linear.weight, torch.from_numpy(w))
     out = module(torch.ones(3))
-    assert isinstance(out, typing.Tuple)
+    assert isinstance(out, tuple)
     assert out[0].shape == (2,)
 
 
@@ -309,7 +308,7 @@ def test_map_subgraph_with_state():
     module = nir_interpreter.nir_to_torch(graph, {nir.LI: _map_li})
     data = torch.ones(1)
     out = module(data)
-    assert isinstance(out, typing.Tuple)
+    assert isinstance(out, tuple)
     assert out[0].shape == (1,)
     module_result = li_module(data)[0]
     assert torch.allclose(out[0], module_result)
@@ -324,7 +323,7 @@ def test_map_nested_subgraph_default():
     module = nir_interpreter.nir_to_torch(graph, {})
     assert torch.allclose(module.nirgraph.nirgraph.linear.weight, torch.from_numpy(w))
     out = module(torch.ones(3))
-    assert isinstance(out, typing.Tuple)
+    assert isinstance(out, tuple)
     assert out[0].shape == (2,)
 
 
@@ -399,14 +398,14 @@ def test_map_recursive_graph_two_nodes():
     assert torch.allclose(actual, expected)
     assert torch.allclose(state["linear2_prev_output"], expected)
     actual2, _ = module(data, state)
-    assert torch.allclose(actual2, lin_module(lin_module((expected + data))))
+    assert torch.allclose(actual2, lin_module(lin_module(expected + data)))
 
 
 def test_find_recursive_inputs_multiple():
     node = "A"
-    edges = set([("A", "B"), ("B", "C"), ("B", "A"), ("C", "A")])
+    edges = {("A", "B"), ("B", "C"), ("B", "A"), ("C", "A")}
     actual = nir_interpreter._find_recursive_inputs(node, edges)
-    assert actual == set(["B", "C"])
+    assert actual == {"B", "C"}
 
 
 def test_map_recursive_graph_multiple_nodes():
@@ -429,7 +428,7 @@ def test_map_recursive_graph_multiple_nodes():
     ]
     """
     In -> 1 -> 2 -> Out
-          ^---/ \---> 3 --\
+          ^---/ \\---> 3 --\
           ^----------/ ^--/   
     """
     graph = nir.NIRGraph(nodes, edges)

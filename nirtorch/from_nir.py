@@ -1,16 +1,18 @@
+from __future__ import annotations
+
 import warnings
-from typing import Callable, Optional, Union
+from collections.abc import Callable
 
 import nir
 import torch
-import torch.nn as nn
+from torch import nn
 
 from .graph import TorchGraph
 from .graph_executor import GraphExecutor
 from .utils import sanitize_name
 
 
-def _switch_default_models(nir_graph: nir.NIRNode) -> Optional[torch.nn.Module]:
+def _switch_default_models(nir_graph: nir.NIRNode) -> torch.nn.Module | None:
     node = None
     if isinstance(nir_graph, nir.Input):
         node = torch.nn.Identity()
@@ -49,7 +51,7 @@ def _map_graph_to_torch(
 
 
 def load(
-    nir_graph: Union[nir.NIRNode, str],
+    nir_graph: nir.NIRNode | str,
     model_map: Callable[[nir.NIRNode], nn.Module],
     return_state: bool = True,
 ) -> nn.Module:
@@ -75,7 +77,7 @@ def load(
     """
     warnings.warn(
         "nirtorch.load is being deprecated in favour of nirtorch.nir_to_torch. "
-        "Please refer to https://neuroir.org/docs/dev_pytorch.html for detailed instructions",
+        "Please refer to https://neuroir.org/docs/dev_pytorch/ for detailed instructions",
         DeprecationWarning,
     )
 

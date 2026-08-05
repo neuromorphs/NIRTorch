@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 import dataclasses
 import inspect
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import torch
 from torch import nn
 
-from .graph import TorchGraph, Node
+from .graph import Node, TorchGraph
 from .graph_utils import trace_execution
 from .utils import sanitize_name
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -17,8 +21,8 @@ class GraphExecutorState:
     and caches the output of previous modules, for use in (future) recurrent
     computations."""
 
-    state: Dict[str, Any] = dataclasses.field(default_factory=dict)
-    cache: Dict[str, Any] = dataclasses.field(default_factory=dict)
+    state: dict[str, Any] = dataclasses.field(default_factory=dict)
+    cache: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
 class GraphExecutor(nn.Module):
@@ -52,18 +56,20 @@ class GraphExecutor(nn.Module):
         signature = inspect.signature(module.forward)
         arguments = len(signature.parameters)
         # HACK for snntorch modules
-        if "snntorch" in str(module.__class__):
-            if module.__class__.__name__ in [
+        if (
+            "snntorch" in str(module.__class__)
+            and module.__class__.__name__ in [
                 "Synaptic",
                 "RSynaptic",
                 "Leaky",
                 "RLeaky",
-            ]:
-                return not module.init_hidden
+            ]
+        ):
+            return not module.init_hidden
         # Note that GraphExecutor is *also* a stateful module
         return "state" in signature.parameters and arguments > 1
 
-    def get_execution_order(self) -> List[Node]:
+    def get_execution_order(self) -> list[Node]:
         """Evaluate the execution order and instantiate that as a list."""
         inputs = set()
         name_dict = {name: node for node, name in self.graph.module_names.items()}
@@ -71,12 +77,12 @@ class GraphExecutor(nn.Module):
             if input_node.name in name_dict:
                 inputs.add(input_node)
             else:
-                logging.warning(
+                logger.warning(
                     f"Input node {input_node.name} not found in module names. Skipping."
                 )
         assert len(inputs) > 0, "No input nodes found, we require at least one."
         if len(inputs) > 1:
-            logging.warning(
+            logger.warning(
                 "Multiple input nodes found. Using the first node as the input."
             )
         return trace_execution(next(iter(inputs)), lambda n: n.outgoing_nodes.keys())
@@ -88,17 +94,17 @@ class GraphExecutor(nn.Module):
                 if self._is_module_stateful(mod):
                     self.stateful_modules.add(sanitize_name(name))
 
-    def get_input_nodes(self) -> List[Node]:
+    def get_input_nodes(self) -> list[Node]:
         # NOTE: This is a hack. Should use the input nodes from NIR graph
         return self.graph.get_root()
 
     def _apply_module(
         self,
         node: Node,
-        input_nodes: List[Node],
+        input_nodes: list[Node],
         new_state: GraphExecutorState,
         old_state: GraphExecutorState,
-        data: Optional[torch.Tensor] = None,
+        data: torch.Tensor | None = None,
     ):
         """Applies a module and keeps track of its state.
 
@@ -121,7 +127,7 @@ class GraphExecutor(nn.Module):
                 summed_inputs.append(new_state.cache[input_node.name])
 
         if len(summed_inputs) == 0:
-            raise ValueError("No inputs found for node {}".format(node.name))
+            raise ValueError(f"No inputs found for node {node.name}")
         elif len(summed_inputs) == 1:  # Prepend the input
             inputs.insert(0, summed_inputs[0])
         elif len(summed_inputs) > 1:  # Prepend the sum of the inputs
@@ -142,7 +148,7 @@ class GraphExecutor(nn.Module):
             out = out[0]
         return out, new_state
 
-    def forward(self, data: torch.Tensor, state: Optional[GraphExecutorState] = None):
+    def forward(self, data: torch.Tensor, state: GraphExecutorState | None = None):
         if state is None:
             state = GraphExecutorState()
         new_state = GraphExecutorState()

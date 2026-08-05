@@ -1,17 +1,21 @@
+from __future__ import annotations
+
 import warnings
+from collections.abc import Callable
 from numbers import Number
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
+from typing import Any
 
 import nir
 import torch
-import torch.nn as nn
+from torch import nn
+from typing_extensions import Self
 
 from .utils import sanitize_name
 
 
 def named_modules_map(
-    model: nn.Module, model_name: Optional[str] = "model"
-) -> Dict[str, nn.Module]:
+    model: nn.Module, model_name: str | None = "model"
+) -> dict[str, nn.Module]:
     """Inverse of named modules dictionary.
 
     Args:
@@ -29,8 +33,7 @@ def named_modules_map(
             continue
         modules_map[mod] = name
     if model_name is None:
-        if model in modules_map:
-            del modules_map[model]
+        modules_map.pop(model, None)
     else:
         modules_map[model] = model_name
     return modules_map
@@ -41,7 +44,7 @@ class Node:
         self,
         elem: Any,
         name: str,
-        outgoing_nodes: Optional[Dict["Node", torch.Tensor]] = None,
+        outgoing_nodes: dict[Node, torch.Tensor] | None = None,
     ) -> None:
         self.elem = elem
         self.name = name
@@ -50,7 +53,7 @@ class Node:
         else:
             self.outgoing_nodes = outgoing_nodes
 
-    def add_outgoing(self, node: "Node", shape=None) -> None:
+    def add_outgoing(self, node: Node, shape=None) -> None:
         self.outgoing_nodes[node] = shape
 
     def __str__(self) -> str:
@@ -59,7 +62,7 @@ class Node:
     def __repr__(self) -> str:
         return self.__str__()
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         # Two nodes are meant to be the same if they refer to the same element
         try:
             return self.elem is other.elem
@@ -71,7 +74,7 @@ class Node:
         return hash(self.elem)
 
 
-def _find_input_nodes(graph: "TorchGraph") -> Set[nir.Input]:
+def _find_input_nodes(graph: TorchGraph) -> set[nir.Input]:
     # First, check if the graph is empty or singular
     if len(graph.node_list) == 0:
         raise ValueError("Cannot find the input of an empty graph")
@@ -89,17 +92,19 @@ def _find_input_nodes(graph: "TorchGraph") -> Set[nir.Input]:
 class TorchGraph:
     def __init__(
         self,
-        module_names: Dict[nn.Module, str],
-        inputs: Optional[Set[str]],
-        module_output_types: Dict[nn.Module, torch.Tensor] = {},
+        module_names: dict[nn.Module, str],
+        inputs: set[str] | None,
+        module_output_types: dict[nn.Module, torch.Tensor] | None = None,
     ) -> None:
         self.module_names = module_names
-        self.node_list: List[Node] = []
+        self.node_list: list[Node] = []
+        if module_output_types is None:
+            module_output_types = {}
         self.module_output_types = module_output_types
         self._last_used_tensor_id = None
         self.inputs = inputs
 
-    def _discover_inputs(self, edges: List[Tuple[str, str]]):
+    def _discover_inputs(self, edges: list[tuple[str, str]]):
         nodes = {name: node for node, name in self.module_names.items()}
         for src, dst in edges:
             # Allow edges to refer to subgraph inputs and outputs
@@ -113,8 +118,8 @@ class TorchGraph:
 
     @staticmethod
     def from_torch_modules(
-        nodes: Dict[str, nn.Module], edges: List[Tuple[str, str]]
-    ) -> "TorchGraph":
+        nodes: dict[str, nn.Module], edges: list[tuple[str, str]]
+    ) -> TorchGraph:
         module_names = {module: sanitize_name(name) for name, module in nodes.items()}
         # Construct the graph by adding edges and, finally, inputs
         graph = TorchGraph(module_names=module_names, inputs=set())
@@ -134,7 +139,7 @@ class TorchGraph:
             self._last_used_tensor_id += 1
         return str(self._last_used_tensor_id)
 
-    def __contains__(self, elem: Union[torch.Tensor, nn.Module]) -> bool:
+    def __contains__(self, elem: torch.Tensor | nn.Module) -> bool:
         for node in self.node_list:
             if elem is node.elem:
                 return True
@@ -149,7 +154,7 @@ class TorchGraph:
             self.node_list.append(node)
             return node
 
-    def add_or_get_node_for_elem(self, elem: Union[torch.Tensor, nn.Module]):
+    def add_or_get_node_for_elem(self, elem: torch.Tensor | nn.Module):
         if elem in self:
             return self.find_node(elem)
         else:
@@ -166,7 +171,7 @@ class TorchGraph:
             new_node = self.add_elem(elem, name)
             return new_node
 
-    def find_node(self, elem: Union[torch.Tensor, nn.Module]):
+    def find_node(self, elem: torch.Tensor | nn.Module):
         for node in self.node_list:
             if elem is node.elem:
                 return node
@@ -174,8 +179,8 @@ class TorchGraph:
 
     def add_edge(
         self,
-        source: Union[torch.Tensor, nn.Module],
-        destination: Union[torch.Tensor, nn.Module],
+        source: torch.Tensor | nn.Module,
+        destination: torch.Tensor | nn.Module,
         shape: torch.Tensor = None,
     ):
         if self._is_mod_and_not_in_module_names(source):
@@ -191,10 +196,10 @@ class TorchGraph:
         source_node.add_outgoing(destination_node, shape)
         return source_node, destination_node
 
-    def get_leaf_modules(self) -> Dict[nn.Module, str]:
+    def get_leaf_modules(self) -> dict[nn.Module, str]:
         filtered_module_names = {}
 
-        for mod, _ in self.module_names.items():
+        for mod in self.module_names:
             # Add module to dict
             filtered_module_names[mod] = self.module_names[mod]
             child_in_graph = False
@@ -216,12 +221,9 @@ class TorchGraph:
         Returns:
             bool
         """
-        if isinstance(elem, nn.Module) and elem not in self.module_names:
-            return True
-        else:
-            return False
+        return isinstance(elem, nn.Module) and elem not in self.module_names
 
-    def populate_from(self, other_graph: "TorchGraph"):
+    def populate_from(self, other_graph: TorchGraph):
         self.module_output_types.update(other_graph.module_output_types)
         for node in other_graph.node_list:
             for outgoing_node, shape in node.outgoing_nodes.items():
@@ -234,7 +236,7 @@ class TorchGraph:
         debug_str = ""
         for node in self.node_list:
             debug_str += f"{node.name} ({node.elem.__class__.__name__})\n"
-            for outgoing, shape in node.outgoing_nodes.items():
+            for outgoing in node.outgoing_nodes:
                 debug_str += (
                     f"\t-> {outgoing.name} ({outgoing.elem.__class__.__name__})\n"
                 )
@@ -244,31 +246,31 @@ class TorchGraph:
         mermaid_md = """```mermaid\ngraph TD;\n"""
         for node in self.node_list:
             if node.outgoing_nodes:
-                for outgoing, _ in node.outgoing_nodes.items():
+                for outgoing in node.outgoing_nodes:
                     mermaid_md += f"{node.name} --> {outgoing.name};\n"
             else:
                 mermaid_md += f"{node.name};\n"
 
         return mermaid_md + "\n```\n"
 
-    def leaf_only(self) -> "TorchGraph":
+    def leaf_only(self) -> TorchGraph:
         leaf_modules = self.get_leaf_modules()
         filtered_graph = TorchGraph(leaf_modules, inputs=self.inputs)
         # Populate edges
         filtered_graph.populate_from(self)
         return filtered_graph
 
-    def ignore_submodules_of(self, classes: List[Type]) -> "TorchGraph":
+    def ignore_submodules_of(self, classes: list[type]) -> TorchGraph:
         new_named_modules = {}
 
         # Gather a list of all top level modules, whose submodules are to be ignored
-        top_level_modules: List[nn.Module] = []
-        for mod in self.module_names.keys():
+        top_level_modules: list[nn.Module] = []
+        for mod in self.module_names:
             if mod.__class__ in classes:
                 top_level_modules.append(mod)
 
         # List all the submodules of the above module list
-        sub_modules_to_ignore: List[nn.Module] = []
+        sub_modules_to_ignore: list[nn.Module] = []
         for top_mod in top_level_modules:
             for sub_mod in top_mod.modules():
                 if sub_mod is not top_mod:
@@ -287,7 +289,7 @@ class TorchGraph:
         new_graph.populate_from(self)
         return new_graph
 
-    def find_source_nodes_of(self, node: Node) -> List[Node]:
+    def find_source_nodes_of(self, node: Node) -> list[Node]:
         """Find all the sources of a node in the graph.
 
         Args:
@@ -298,12 +300,12 @@ class TorchGraph:
         """
         source_node_list = []
         for source_node in self.node_list:
-            for outnode, _ in source_node.outgoing_nodes.items():
+            for outnode in source_node.outgoing_nodes:
                 if node == outnode:
                     source_node_list.append(source_node)
         return source_node_list
 
-    def ignore_tensors(self) -> "TorchGraph":
+    def ignore_tensors(self) -> TorchGraph:
         """Simplify the graph by ignoring all the tensors in it.
 
         Returns:
@@ -311,7 +313,7 @@ class TorchGraph:
         """
         return self.ignore_nodes(torch.Tensor)
 
-    def ignore_nodes(self, class_type: Type) -> "TorchGraph":
+    def ignore_nodes(self, class_type: type) -> TorchGraph:
         # Filter module names to remove the given class type
         new_module_names = {
             k: v for k, v in self.module_names.items() if not isinstance(k, class_type)
@@ -348,14 +350,14 @@ class TorchGraph:
                         graph.add_edge(node.elem, outnode.elem, shape)
         return graph
 
-    def get_edges(self) -> List[Tuple[str, str]]:
+    def get_edges(self) -> list[tuple[str, str]]:
         edges = []
         for node in self.node_list:
             for outgoing_node in node.outgoing_nodes:
                 edges.append((node.name, outgoing_node.name))
         return edges
 
-    def get_root(self) -> List[Node]:
+    def get_root(self) -> list[Node]:
         """Returns the root node/s of the graph.
 
         Returns:
@@ -368,7 +370,7 @@ _torch_module_call = torch.nn.Module.__call__
 
 
 def module_forward_wrapper(
-    model_graph: TorchGraph, output_types: Dict[nn.Module, torch.Tensor]
+    model_graph: TorchGraph, output_types: dict[nn.Module, torch.Tensor]
 ) -> Callable[..., Any]:
     def my_forward(mod: nn.Module, *args, **kwargs) -> Any:
         out = _torch_module_call(mod, *args, **kwargs)
@@ -380,7 +382,7 @@ def module_forward_wrapper(
             out_tuple = (out,)
             output_types[mod] = out.shape
         else:
-            raise Exception("Unknown output format")
+            raise TypeError("Unknown output format")
 
         # Iterate over all inputs
         for i, input_data in enumerate(args):
@@ -417,12 +419,12 @@ class GraphTracer:
     ```
     """
 
-    def __init__(self, module_map: Dict[nn.Module, str]) -> None:
+    def __init__(self, module_map: dict[nn.Module, str]) -> None:
         self.original_torch_call = nn.Module.__call__
         self.output_types = {}
         self.graph = TorchGraph(module_map, self.output_types)
 
-    def __enter__(self) -> "GraphTracer":
+    def __enter__(self) -> Self:
         # Override the torch call method
         nn.Module.__call__ = module_forward_wrapper(self.graph, self.output_types)
         return self
@@ -450,8 +452,8 @@ class GraphTracer:
 def extract_torch_graph(
     model: nn.Module,
     sample_data: Any,
-    model_name: Optional[str] = "model",
-    model_args=[],
+    model_name: str | None = "model",
+    model_args=None,
 ) -> TorchGraph:
     """Extract computational graph between various modules in the model
     NOTE: This method is not capable of any compute happening outside of module
@@ -471,6 +473,7 @@ def extract_torch_graph(
     Returns:
         Graph: A graph object representing the computational graph of the given model
     """
+    model_args = model_args if model_args is not None else []
     module_map = named_modules_map(model, model_name=model_name)
     with GraphTracer(module_map) as tracer, torch.no_grad():
         _ = model(sample_data, *model_args)

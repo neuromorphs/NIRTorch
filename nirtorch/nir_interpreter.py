@@ -1,14 +1,16 @@
+from __future__ import annotations
+
 import collections
+import inspect
 import keyword
-import typing
-import pathlib
 import operator
+import pathlib
+import typing
 
 import nir
 import torch
-import inspect
 
-NodeMapType = typing.Dict[nir.NIRNode, typing.Callable[[nir.NIRNode], torch.nn.Module]]
+NodeMapType = dict[nir.NIRNode, typing.Callable[[nir.NIRNode], torch.nn.Module]]
 
 
 def _default_map_affine(linear: nir.Affine) -> torch.nn.Linear:
@@ -118,7 +120,7 @@ def _sanitize_name(name: str) -> str:
 
 def _map_nir_node_to_torch(
     node: nir.NIRNode, node_map: NodeMapType
-) -> typing.Optional[torch.nn.Module]:
+) -> torch.nn.Module | None:
     """Maps a single NIR node to PyTorch using the given node map.
     If the type is not present in the node map, raise an error.
 
@@ -160,7 +162,7 @@ def _construct_module_dict_recursive(
 
 
 def _can_reach(
-    start: str, end: str, edges: typing.List[typing.Tuple[str, str]]
+    start: str, end: str, edges: list[tuple[str, str]]
 ) -> bool:
     """Helper function to determine if there's a path from start to end in the graph."""
     visited = set()
@@ -181,7 +183,7 @@ def _can_reach(
     return False
 
 
-def _find_recursive_inputs(node: str, edges: typing.Set[typing.Tuple[str, str]]):
+def _find_recursive_inputs(node: str, edges: set[tuple[str, str]]):
     """Locates one or more inputs to the node from *future* nodes.
     That is, find other nodes that uses the output of this node as their input and whose
     output this node requires.
@@ -201,10 +203,10 @@ def _find_recursive_inputs(node: str, edges: typing.Set[typing.Tuple[str, str]])
     recursive_inputs = set()
 
     # Find all nodes that our target node outputs to
-    outputs = set(end for start, end in edges if start == node)
+    outputs = {end for start, end in edges if start == node}
 
     # Find all nodes that provide input to our target node
-    inputs = set(start for start, end in edges if end == node)
+    inputs = {start for start, end in edges if end == node}
 
     # Iterate over all the nodes that provide input to this module
     for other_node in inputs:
@@ -218,11 +220,11 @@ def _find_recursive_inputs(node: str, edges: typing.Set[typing.Tuple[str, str]])
 
 def _find_input_nodes(
     name: str,
-    edges: typing.List[typing.Tuple[str, str]],
-    node_outputs: typing.Dict[str, torch.fx.Node],
-    torch_graph: typing.Optional[torch.fx.Graph] = None,
-    state_node: typing.Optional[torch.fx.Node] = None,
-) -> typing.Tuple[typing.Set[str], bool]:
+    edges: list[tuple[str, str]],
+    node_outputs: dict[str, torch.fx.Node],
+    torch_graph: torch.fx.Graph | None = None,
+    state_node: torch.fx.Node | None = None,
+) -> tuple[set[str], bool]:
     """
     Looks through the edges and find nodes that are connected to the given node as inputs.
     If one of the inputs doesn't exist because it hasn't been defined, we return None.
@@ -290,16 +292,13 @@ def _is_stateful(module: torch.nn.Module) -> bool:
     signature = inspect.signature(module.forward)
     return (
         "state" in signature.parameters  # Contains a state input argument
-        or isinstance(module, torch.nn.RNNBase)  # RNN modules are stateful
-        or isinstance(
-            module, torch.fx.GraphModule
-        )  # GraphModules created by us are always stateful
+        or isinstance(module, (torch.nn.RNNBase, torch.fx.GraphModule))  # RNN modules are stateful, GraphModules created by us are always stateful
     )
 
 
 def _construct_state_recursive(
     parent_module: torch.nn.ModuleDict,
-) -> typing.Dict[str, typing.Any]:
+) -> dict[str, typing.Any]:
     """Takes a dictionary of modules and constructs a recursive dictionary of empty states
     (set to None), which will be populated once the module has any output.
 
@@ -390,7 +389,7 @@ def _construct_fx_graph(
                 raise NotImplementedError(
                     "Multiple inputs to a graph are currently not supported"
                 )
-            for input_name, _ in module.input_type.items():
+            for input_name in module.input_type:
                 node_outputs[module_name] = torch_graph.create_node(
                     "placeholder", input_name
                 )
@@ -400,7 +399,7 @@ def _construct_fx_graph(
             # - This has to happen *after* we create the input placeholders to avoid adding a parameter with default values before the input argument
             state_placeholder = torch_graph.placeholder(
                 "state",
-                type_expr=typing.Dict[str, typing.Any],
+                type_expr=dict[str, typing.Any],
                 default_value=None,
             )
 
@@ -557,7 +556,7 @@ def _construct_fx_graph(
 
 
 def nir_to_torch(
-    nir_node: typing.Union[str, nir.NIRNode],
+    nir_node: str | nir.NIRNode,
     node_map: NodeMapType,
     default_map: NodeMapType = DEFAULT_MAP,
     device: torch.device = "cpu",
@@ -606,7 +605,7 @@ def nir_to_torch(
         device (torch.device): The device to load the modules and parameters on. Defaults to "cpu"
         dtype (torch.dtype): The precision with which to load the modules and parameters. Defaults to torch.float32
     """
-    if isinstance(nir_node, str) or isinstance(nir_node, pathlib.Path):
+    if isinstance(nir_node, (str, pathlib.Path)):
         nir_node = nir.read(nir_node)
     map_with_defaults = dict(default_map)
     map_with_defaults.update(node_map)  # Overwrite defaults with node_map

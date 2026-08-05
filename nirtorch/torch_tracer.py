@@ -1,9 +1,11 @@
-from typing import Any, Callable, Dict, Optional, Set, Tuple, Type
-import operator
+from __future__ import annotations
 
-import numpy as np
+import operator
+from collections.abc import Callable
+from typing import Any
 
 import nir
+import numpy as np
 import torch
 
 
@@ -14,7 +16,7 @@ def _map_linear(module: torch.nn.Module) -> nir.NIRNode:
         return nir.Affine(module.weight.detach().numpy(), module.bias.detach().numpy())
 
 
-DEFAULT_MAP: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]] = {
+DEFAULT_MAP: dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]] = {
     torch.nn.Linear: _map_linear
     # TODO: Add more default nodes
     # https://github.com/neuromorphs/NIRTorch/issues/25
@@ -23,7 +25,7 @@ DEFAULT_MAP: Dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]] = {
 
 class NIRTorchTracer(torch.fx.Tracer):
 
-    def __init__(self, custom_leaf_modules: Tuple[torch.nn.Module] = None, **kwargs):
+    def __init__(self, custom_leaf_modules: tuple[torch.nn.Module] | None = None, **kwargs):
         """Extends PyTorch's default symbolic tracing with a set of custom leaf nodes"""
         super().__init__(**kwargs)
         if custom_leaf_modules is not None and not isinstance(
@@ -59,11 +61,11 @@ class NIRTorchTracer(torch.fx.Tracer):
 
 
 class NIRTorchTransformer(torch.fx.Transformer):
-    def call_function(self, target: str, args: Tuple, kwargs: Dict) -> Any:
+    def call_function(self, target: str, args: tuple, kwargs: dict) -> Any:
         print("sup", target)
         return super().call_function(target, args, kwargs)
 
-    def call_method(self, target: str, args: Tuple, kwargs: Dict) -> Any:
+    def call_method(self, target: str, args: tuple, kwargs: dict) -> Any:
         return super().call_method(target, args, kwargs)
 
     def call_module(self, target, args, kwargs):
@@ -73,13 +75,13 @@ class NIRTorchTransformer(torch.fx.Transformer):
 
 def torch_to_nir(
     module: torch.nn.Module,
-    module_map: Dict[torch.nn.Module, Callable[[torch.nn.Module], Optional[nir.NIRNode]]],
-    default_dict: Dict[
+    module_map: dict[torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode | None]],
+    default_dict: dict[
         torch.nn.Module, Callable[[torch.nn.Module], nir.NIRNode]
     ] = DEFAULT_MAP,
     type_check: bool = True,
-    stateful_modules: Optional[Set[Type[torch.nn.Module]]] = None,
-    concrete_args: Optional[Dict[str, Any]] = None,
+    stateful_modules: set[type[torch.nn.Module]] | None = None,
+    concrete_args: dict[str, Any] | None = None,
 ) -> nir.NIRGraph:
     """
     Traces a PyTorch module and converts it to a NIR graph using the specified module map.
@@ -143,7 +145,7 @@ def torch_to_nir(
     ignored_nodes = set()
     bypass_nodes = set()
 
-    def _find_users(node: torch.fx.Node) -> Set[torch.fx.Node]:
+    def _find_users(node: torch.fx.Node) -> set[torch.fx.Node]:
         """
         Finds all the users (outputs) of a given node, recursively if the node is registered as a bypass node
         """
@@ -157,7 +159,7 @@ def torch_to_nir(
                 nodes.add(user)
         return nodes
 
-    def _find_inputs(node: torch.fx.Node) -> Set[torch.fx.Node]:
+    def _find_inputs(node: torch.fx.Node) -> set[torch.fx.Node]:
         """
         Finds all the inputs (inputs) of a given node, recursively if the node is registered as a circumvented node
         """
@@ -290,8 +292,8 @@ def torch_to_nir(
                         )
 
                     if len(first_input_type.keys()) == 1:
-                        first_type = list(first_input_type.values())[0]
-                        follower_type = list(follower_node.input_type.values())[0]
+                        first_type = next(iter(first_input_type.values()))
+                        follower_type = next(iter(follower_node.input_type.values()))
                         if not np.array_equal(first_type, follower_type):
                             raise ValueError(
                                 f"Input type mismatch for followers of {node_name}: {first_type} vs {follower_type}"

@@ -1,22 +1,27 @@
+from __future__ import annotations
+
+import itertools
 import logging
-from typing import Any, Callable, Optional, Sequence
 import warnings
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import nir
 import numpy as np
-import torch.nn as nn
+from torch import nn
 
 from .graph import extract_torch_graph
 
+logger = logging.getLogger(__name__)
 
 def extract_nir_graph(
     model: nn.Module,
     model_map: Callable[[nn.Module], nir.NIRNode],
     sample_data: Any,
-    model_name: Optional[str] = "model",
+    model_name: str | None = "model",
     ignore_submodules_of=None,
-    model_fwd_args=[],
-    ignore_dims: Optional[Sequence[int]] = None,
+    model_fwd_args=None,
+    ignore_dims: Sequence[int] | None = None,
 ) -> nir.NIRNode:
     """
     DEPRECATED: Use `nirtorch.torch_to_nir` instead.
@@ -43,6 +48,8 @@ def extract_nir_graph(
     Returns:
         nir.NIR: Returns the generated NIR graph representation.
     """
+    if model_fwd_args is None:
+        model_fwd_args = []
     warnings.warn(
         "nirtorch.extract_nir_graph is being deprecated in favour of nirtorch.torch_to_nir. "
         "Please refer to https://neuroir.org/docs/dev_pytorch.html for detailed instructions",
@@ -107,12 +114,12 @@ def extract_nir_graph(
         # TODO: Replace with mapping to input(s)/output(s) of subgraph
         if indx == 0:  # TODO:
             keys = list(nir_nodes.keys())
-            for k1, k2 in zip(keys[:-1], keys[1:]):
+            for k1, k2 in itertools.pairwise(keys):
                 nir_edges.append((k1, k2))
 
     # Get all the edges
     for node in torch_graph.node_list:
-        for destination, shape in node.outgoing_nodes.items():
+        for destination in node.outgoing_nodes:
             nir_edges.append((node.name, destination.name))
 
         if len(node.outgoing_nodes) == 0:
@@ -157,7 +164,7 @@ def extract_nir_graph(
     # HACK: remove self-connections (this is a bug in the extraction of an RNN graph)
     for edge in nir_edges:
         if edge[0] == edge[1]:
-            logging.warn(f"removing self-connection {edge}")
+            logger.warning(f"removing self-connection {edge}")
             nir_edges.remove(edge)
 
     return nir.NIRGraph(nir_nodes, nir_edges, type_check=False)

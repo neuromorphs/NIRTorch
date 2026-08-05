@@ -1,7 +1,6 @@
-import pytest
-
 import nir
 import numpy as np
+import pytest
 import torch
 
 from nirtorch.torch_tracer import torch_to_nir
@@ -69,7 +68,7 @@ def test_trace_mapped_module_stateless():
     assert len(graph.edges) == 2
     assert len(_filter_edges(graph, nir.Input, nir.Affine)) == 1
     assert len(_filter_edges(graph, nir.Affine, nir.Output)) == 1
-    input_node_name, input_node = list(graph.inputs.items())[0]
+    input_node_name, input_node = next(iter(graph.inputs.items()))
     assert input_node.input_type["input"] == np.array([3])
     assert graph.input_type[input_node_name] == np.array([3])
 
@@ -90,7 +89,7 @@ def test_trace_mapped_module_stateful():
     assert len(graph.edges) == 2
     assert len(_filter_edges(graph, nir.Input, nir.Affine)) == 1
     assert len(_filter_edges(graph, nir.Affine, nir.Output)) == 1
-    input_node_name, input_node = list(graph.inputs.items())[0]
+    input_node_name, input_node = next(iter(graph.inputs.items()))
     assert input_node.input_type["input"] == np.array([3])
     assert graph.input_type[input_node_name] == np.array([3])
 
@@ -131,7 +130,7 @@ def test_trace_sequential():
 def test_trace_submodule():
     class MyModule(torch.nn.Module):
         def __init__(self):
-            super(MyModule, self).__init__()
+            super().__init__()
             self.linear = torch.nn.Linear(1, 1)
 
         def forward(self, x):
@@ -154,7 +153,7 @@ def test_trace_submodule():
 def test_trace_nested_submodule():
     class MyModule(torch.nn.Module):
         def __init__(self):
-            super(MyModule, self).__init__()
+            super().__init__()
             self.linear = torch.nn.Linear(1, 1)
 
         def forward(self, x):
@@ -162,7 +161,7 @@ def test_trace_nested_submodule():
 
     class MyModule2(torch.nn.Module):
         def __init__(self):
-            super(MyModule2, self).__init__()
+            super().__init__()
             self.module = MyModule()
             self.linear = torch.nn.Linear(1, 1)
 
