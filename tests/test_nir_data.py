@@ -4,7 +4,6 @@ import numpy as np
 import torch
 
 
-
 def test_event_data_from_nir():
     nir_data = nir.NIRGraphData(
         nodes={
@@ -36,7 +35,7 @@ def test_stable_conversion():
     converted_spikes = from_nir_data(nir_data, dt=0.001)
 
     assert torch.equal(original_spikes["lif"], converted_spikes["lif"]), (
-        "Mismatch in spikes for node 'lif'"
+        f"Mismatch in spikes for node 'lif'. Got {converted_spikes['lif'].shape}, expected {original_spikes['lif'].shape}"
     )
 
 
@@ -47,5 +46,5 @@ def test_stable_conversion_with_time_unit():
     converted_spikes = from_nir_data(nir_data, dt=1e-3, time_unit=1e-3)
 
     assert torch.equal(original_spikes["lif"], converted_spikes["lif"]), (
-        "Mismatch in spikes for node 'lif' with time unit conversion"
+        f"Mismatch in spikes for node 'lif' with time unit conversion. Got {converted_spikes['lif'].shape}, expected {original_spikes['lif'].shape}"
     )

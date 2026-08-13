@@ -2,7 +2,6 @@
 Convert spikes from a torch tensor to a NIRGraphData object.
 """
 
-import torch
 from nir.data_ir import NIRGraphData, NIRNodeData, TimeGriddedData
 
 
@@ -10,7 +9,8 @@ def to_nir_data(
     torch_dict: dict,
     dt: float,
     time_unit: float = 1.0,
-    shape: tuple = ("T", "B", "N"),
+    dimension_order: tuple = ("time", "batch", "neuron"),
+    dynamic_before_transition: bool = True,
 ) -> NIRGraphData:
     """
     Args:
@@ -20,24 +20,30 @@ def to_nir_data(
         dt: The time step size of the spike data.
         time_unit: The unit of time for the spike data and dt. Defaults to 1.0,
             which corresponds to seconds. For milliseconds, set this to 1e-3.
-        shape: The shape of the input spike tensors. Defaults to
-            ('T', 'B', 'N') for (time, batch, neurons). If the spike tensors
-            have a different shape, this can be used to specify the correct
-            ordering of dimensions.
+        dimension_order: The order of dimensions in the input spike tensors.
+            Defaults to ("time", "batch", "neuron").
+        dynamic_before_transition: If True, the membrane potential is updated
+            before checking if the threshold has been crossed and generating an
+            event (transition). If False, the state is updated after the event
+            generation. Default is True.
     Returns:
         A NIRGraphData object containing the spike data.
     """
     nir_nodes = {}
 
     for key, spikes in torch_dict.items():
-        # reorder dimensions to (batch, time, neurons)
-        spikes = torch.permute(
-            spikes, (shape.index("B"), shape.index("T"), shape.index("N"))
-        )
-
         spikes = spikes.detach().cpu().numpy().astype(bool)
 
-        nir_node_data = NIRNodeData({"spikes": TimeGriddedData(spikes, dt * time_unit)})
+        nir_node_data = NIRNodeData(
+            {
+                "spikes": TimeGriddedData(
+                    spikes,
+                    dt * time_unit,
+                    dimension_order=dimension_order,
+                    dynamic_before_transition=dynamic_before_transition,
+                )
+            }
+        )
         nir_nodes[key] = nir_node_data
 
     nir_data = NIRGraphData(nir_nodes)
