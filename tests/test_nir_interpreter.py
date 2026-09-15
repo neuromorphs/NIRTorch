@@ -80,6 +80,32 @@ def test_map_nodes_with_periods_in_name():
     assert named_children[0][0] == "some_name"
 
 
+def test_map_affine_node():
+    # Deterministic values, with a bias well outside the range of weight @ x so
+    # that a dropped or randomly-initialised bias cannot pass by coincidence.
+    w = np.array([[1.0, 2.0, 3.0], [0.5, -1.0, 0.25]], dtype=np.float32)
+    b = np.array([7.0, -9.0], dtype=np.float32)
+    affine = nir.Affine(weight=w, bias=b)
+    module = nir_interpreter._map_nir_node_to_torch(affine, nir_interpreter.DEFAULT_MAP)
+    assert torch.allclose(torch.from_numpy(affine.weight), module.weight)
+    assert torch.allclose(torch.from_numpy(affine.bias), module.bias)
+    x = torch.tensor([1.0, 2.0, 3.0])
+    assert torch.allclose(module(x), torch.tensor([21.0, -9.75]))
+
+
+def test_map_affine_node_zero_bias():
+    # An explicitly zero bias must stay zero. This separates "the bias is
+    # dropped" from "the bias is replaced", since a randomly initialised bias
+    # fails here while a dropped one would pass.
+    w = np.array([[1.0, 2.0, 3.0], [0.5, -1.0, 0.25]], dtype=np.float32)
+    b = np.zeros(2, dtype=np.float32)
+    affine = nir.Affine(weight=w, bias=b)
+    module = nir_interpreter._map_nir_node_to_torch(affine, nir_interpreter.DEFAULT_MAP)
+    assert torch.allclose(module.bias, torch.zeros(2))
+    x = torch.tensor([1.0, 2.0, 3.0])
+    assert torch.allclose(module(x), torch.tensor([14.0, -0.75]))
+
+
 def test_map_conv1d_node():
     w = np.random.random((2, 3, 4)).astype(np.float32)
     b = np.random.random((2,)).astype(np.float32)

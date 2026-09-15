@@ -18,7 +18,7 @@ def _default_map_affine(linear: nir.Affine) -> torch.nn.Linear:
         linear.weight.shape[-1], linear.weight.shape[-2], bias=True
     )
     module.weight.data = torch.from_numpy(linear.weight)
-    module.weight.bias = torch.from_numpy(linear.bias)
+    module.bias.data = torch.from_numpy(linear.bias)
     return module
 
 
