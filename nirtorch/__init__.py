@@ -12,6 +12,8 @@ from .from_nir import load  # noqa F401
 from .to_nir import extract_nir_graph
 from .nir_interpreter import nir_to_torch
 from .torch_tracer import torch_to_nir
+from .from_nir_data import from_nir_data
+from .to_nir_data import to_nir_data
 
 __all__ = [
     "extract_nir_graph",
@@ -19,4 +21,6 @@ __all__ = [
     "load",
     "nir_to_torch",
     "torch_to_nir",
+    "from_nir_data",
+    "to_nir_data",
 ]
