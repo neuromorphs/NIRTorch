@@ -23,9 +23,10 @@ def _default_map_affine(linear: nir.Affine) -> torch.nn.Linear:
 
 
 def _default_map_conv1d(conv: nir.Conv1d) -> torch.nn.Conv1d:
+    # NIR stores weights as (C_out, C_in / groups, N), like torch.nn.Conv1d
     module = torch.nn.Conv1d(
+        conv.weight.shape[-2] * conv.groups,
         conv.weight.shape[-3],
-        conv.weight.shape[-2],
         conv.weight.shape[-1],
         stride=conv.stride,
         padding=conv.padding,
@@ -39,9 +40,10 @@ def _default_map_conv1d(conv: nir.Conv1d) -> torch.nn.Conv1d:
 
 
 def _default_map_conv2d(conv: nir.Conv2d) -> torch.nn.Conv2d:
+    # NIR stores weights as (C_out, C_in / groups, H, W), like torch.nn.Conv2d
     c = torch.nn.Conv2d(
+        conv.weight.shape[-3] * conv.groups,
         conv.weight.shape[-4],
-        conv.weight.shape[-3],
         conv.weight.shape[-2:],
         stride=conv.stride,
         padding=conv.padding,
