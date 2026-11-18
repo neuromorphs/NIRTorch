@@ -121,7 +121,40 @@ def test_map_conv1d_node():
     assert nir_conv.padding == torch_conv.padding[0]
     assert nir_conv.dilation == torch_conv.dilation[0]
     assert nir_conv.groups == torch_conv.groups
+    assert torch_conv.in_channels == 3
+    assert torch_conv.out_channels == 2
     assert torch_conv(torch.ones(1, 3, 10)).shape == (1, 2, 2)
+
+
+@pytest.mark.parametrize(
+    "in_channels, out_channels, groups",
+    [(4, 4, 4), (4, 6, 2), (4, 8, 4)],
+    ids=["depthwise", "grouped", "depthwise_multiplier"],
+)
+def test_map_conv1d_node_groups(in_channels, out_channels, groups):
+    rng = np.random.default_rng(0)
+    w = rng.random((out_channels, in_channels // groups, 3)).astype(np.float32)
+    b = rng.random((out_channels,)).astype(np.float32)
+    nir_conv = nir.Conv1d(
+        input_shape=None,
+        weight=w,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=groups,
+        bias=b,
+    )
+    torch_conv = nir_interpreter._map_nir_node_to_torch(
+        nir_conv, nir_interpreter.DEFAULT_MAP
+    )
+    assert torch_conv.in_channels == in_channels
+    assert torch_conv.out_channels == out_channels
+    assert torch_conv.groups == groups
+    x = torch.from_numpy(rng.random((1, in_channels, 10)).astype(np.float32))
+    expected = torch.nn.functional.conv1d(
+        x, torch.from_numpy(w), torch.from_numpy(b), groups=groups
+    )
+    assert torch.allclose(torch_conv(x), expected)
 
 
 def test_map_conv2d_node():
@@ -145,7 +178,40 @@ def test_map_conv2d_node():
     assert nir_conv.padding == torch_conv.padding
     assert nir_conv.dilation == torch_conv.dilation
     assert nir_conv.groups == torch_conv.groups
+    assert torch_conv.in_channels == 3
+    assert torch_conv.out_channels == 2
     assert torch_conv(torch.ones(1, 3, 10, 11)).shape == (1, 2, 5, 3)
+
+
+@pytest.mark.parametrize(
+    "in_channels, out_channels, groups",
+    [(4, 4, 4), (4, 6, 2), (4, 8, 4)],
+    ids=["depthwise", "grouped", "depthwise_multiplier"],
+)
+def test_map_conv2d_node_groups(in_channels, out_channels, groups):
+    rng = np.random.default_rng(0)
+    w = rng.random((out_channels, in_channels // groups, 3, 2)).astype(np.float32)
+    b = rng.random((out_channels,)).astype(np.float32)
+    nir_conv = nir.Conv2d(
+        input_shape=None,
+        weight=w,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=groups,
+        bias=b,
+    )
+    torch_conv = nir_interpreter._map_nir_node_to_torch(
+        nir_conv, nir_interpreter.DEFAULT_MAP
+    )
+    assert torch_conv.in_channels == in_channels
+    assert torch_conv.out_channels == out_channels
+    assert torch_conv.groups == groups
+    x = torch.from_numpy(rng.random((1, in_channels, 10, 11)).astype(np.float32))
+    expected = torch.nn.functional.conv2d(
+        x, torch.from_numpy(w), torch.from_numpy(b), groups=groups
+    )
+    assert torch.allclose(torch_conv(x), expected)
 
 
 def test_map_if_node():
