@@ -315,7 +315,10 @@ def _construct_state_recursive(
 
 
 def _construct_fx_graph(
-    owning_module: torch.nn.ModuleDict, nir_graph: nir.NIRGraph, node_map: dict
+    owning_module: torch.nn.ModuleDict,
+    nir_graph: nir.NIRGraph,
+    node_map: dict,
+    record_outputs: bool = True,
 ) -> torch.fx.GraphModule:
     """Creates a GraphModule from a module dictionary and a NIRGraph by walking over all the edges.
     The GraphModule consists of a torch.fx Graph with nodes representing function and module calls to
@@ -339,6 +342,8 @@ def _construct_fx_graph(
             the modules have already been converted.
         node_map (Dict[nir.NIRNode, Callable[[nir.NIRNode], torch.nn.Module]]): A dictionary that
             maps NIR nodes into Torch modules.
+        record_outputs (bool): If True, the output of every node is stored in
+            ``state["_outputs"][node_name]`` on each forward pass. Defaults to False.
     """
     # Ensure that the graph has input and output nodes
     has_input = any(isinstance(node, nir.Input) for node in nir_graph.nodes.values())
@@ -362,6 +367,7 @@ def _construct_fx_graph(
         (_sanitize_name(a), _sanitize_name(b)) for a, b in nir_graph.edges
     ]
     torch_graph = torch.fx.Graph(owning_module)
+    outputs_node = None  # Holds state["_outputs"] if record_outputs is set
 
     # Create a queue of the modules where we can re-insert modules for re-processing
     # in case of self-reference or if the graph is given out of order
@@ -423,6 +429,14 @@ def _construct_fx_graph(
             )
             state_argument.name = "initialized_state"
 
+            # Optionally create a dictionary in the state to record node outputs
+            if record_outputs:
+                empty_outputs = torch_graph.call_function(dict, ())
+                outputs_node = torch_graph.call_method(
+                    "setdefault", (state_argument, "_outputs", empty_outputs)
+                )
+                outputs_node.name = "recorded_outputs"
+
             visited_nodes.add(module_name)
 
         elif isinstance(module, nir.Output):
@@ -464,7 +478,10 @@ def _construct_fx_graph(
             # 1. Recursively wire subgraphs
             if isinstance(module, nir.NIRGraph) and nir.NIRGraph not in node_map:
                 owning_module[module_name] = _construct_fx_graph(
-                    owning_module[module_name], module, node_map=node_map
+                    owning_module[module_name],
+                    module,
+                    node_map=node_map,
+                    record_outputs=record_outputs,
                 )
 
             # 2. Determine if this is a recursive module
@@ -549,6 +566,13 @@ def _construct_fx_graph(
                         "__setitem__", (state_argument, prev_output_key, output)
                     )
 
+            # Optionally record the node output (e.g. spikes of hidden layers)
+            if outputs_node is not None:
+                torch_graph.call_method(
+                    "__setitem__",
+                    (outputs_node, module_name, node_outputs[module_name]),
+                )
+
             visited_nodes.add(module_name)
 
     # Ensure correctness
@@ -563,6 +587,7 @@ def nir_to_torch(
     default_map: NodeMapType = DEFAULT_MAP,
     device: torch.device = "cpu",
     dtype: torch.dtype = torch.float32,
+    record_outputs: bool = False,
 ) -> torch.fx.GraphModule:
     """
     Maps a NIRGraph as an executable PyTorch GraphModule (torch.fx.GraphModule).
@@ -606,6 +631,10 @@ def nir_to_torch(
             this to provide custom defaults.
         device (torch.device): The device to load the modules and parameters on. Defaults to "cpu"
         dtype (torch.dtype): The precision with which to load the modules and parameters. Defaults to torch.float32
+        record_outputs (bool): If True, the output of every node (e.g. the spikes of hidden layers)
+            is stored in ``state["_outputs"][node_name]`` on each forward pass. Outputs of nodes
+            inside subgraphs are stored in the subgraph's state, i.e.
+            ``state[subgraph_name]["_outputs"][node_name]``. Defaults to False.
     """
     if isinstance(nir_node, (str, pathlib.Path)):
         nir_node = nir.read(nir_node)
@@ -623,5 +652,8 @@ def nir_to_torch(
     owning_module = owning_module.to(device=device, dtype=dtype)
     # - Then wire the graph recursively
     return _construct_fx_graph(
-        owning_module=owning_module, nir_graph=nir_node, node_map=node_map
+        owning_module=owning_module,
+        nir_graph=nir_node,
+        node_map=node_map,
+        record_outputs=record_outputs,
     )

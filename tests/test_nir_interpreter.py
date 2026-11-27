@@ -494,3 +494,37 @@ def test_default_state_initialization():
 
     assert first_state == second_state
     assert first_spikes == second_spikes
+
+
+def test_record_outputs_disabled_by_default():
+    g = nir.NIRGraph.from_list(nir.LI(np.ones(1), np.ones(1), np.zeros(1)))
+    m = nir_interpreter.nir_to_torch(g, _torch_node_map)
+    _, state = m(torch.ones(1))
+    assert "_outputs" not in state
+
+
+def test_record_outputs():
+    li = nir.LI(*(np.full(2, v, dtype=np.float32) for v in (0.5, 1.0, 0.0)))
+    w = np.random.random((2, 2)).astype(np.float32)
+    g = nir.NIRGraph.from_list(nir.Linear(w), li, nir.Linear(w))
+    m = nir_interpreter.nir_to_torch(g, _torch_node_map, record_outputs=True)
+    data = torch.rand(2)
+    out, state = m(data)
+    recorded = state["_outputs"]
+    assert set(recorded) == {"linear", "li", "linear_1"}
+    assert torch.allclose(recorded["linear"], m.linear(data))
+    assert torch.allclose(recorded["li"], state["li"])  # LeakyNode outputs its state
+    assert torch.allclose(recorded["linear_1"], out)
+    # Recorded outputs are overwritten on the next step
+    out2, state = m(data, state)
+    assert torch.allclose(state["_outputs"]["linear_1"], out2)
+    assert not torch.allclose(out2, out)
+
+
+def test_record_outputs_subgraph():
+    li = nir.LI(np.ones(1), np.ones(1), np.zeros(1))
+    g = nir.NIRGraph.from_list(nir.NIRGraph.from_list(li))
+    m = nir_interpreter.nir_to_torch(g, _torch_node_map, record_outputs=True)
+    out, state = m(torch.ones(1))
+    assert torch.allclose(state["_outputs"]["nirgraph"], out)
+    assert torch.allclose(state["nirgraph"]["_outputs"]["li"], out)
